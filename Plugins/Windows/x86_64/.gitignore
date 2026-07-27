@@ -1,3 +1,4 @@
-# Keep the native plugin output directory in git.
+# Keep directory in git; allow committed DLLs.
 *
 !.gitignore
+!*.dll
