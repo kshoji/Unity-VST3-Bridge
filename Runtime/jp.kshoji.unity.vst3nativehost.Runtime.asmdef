@@ -2,10 +2,8 @@
     "name": "jp.kshoji.unity.vst3nativehost.Runtime",
     "references": [],
     "includePlatforms": [],
-    "excludePlatforms": [
-        "Editor"
-    ],
-    "allowUnsafeCode": false,
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,

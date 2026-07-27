@@ -1,0 +1,178 @@
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using AOT;
+using UnityEngine;
+
+namespace jp.kshoji.unity.vst3nativehost
+{
+    public sealed class VstHostManager : IDisposable
+    {
+        private static VstHostManager instance;
+
+        private bool initialized;
+        private readonly Dictionary<int, string> loadedPlugins = new Dictionary<int, string>();
+
+        public int SampleRate { get; private set; }
+        public int BlockSize { get; private set; }
+        public bool IsInitialized => initialized;
+        public IReadOnlyDictionary<int, string> LoadedPlugins => loadedPlugins;
+
+        public static VstHostManager Instance
+        {
+            get
+            {
+                if (instance == null)
+                    instance = new VstHostManager();
+                return instance;
+            }
+        }
+
+        private VstHostManager() { }
+
+        public bool Initialize(int sampleRate = 44100, int blockSize = 512)
+        {
+            if (initialized)
+            {
+                Debug.LogWarning("[VstHost] Already initialized.");
+                return true;
+            }
+
+            var result = VstHostNative.VstHost_Initialize(sampleRate, blockSize);
+            if (result != VstHostResult.Ok)
+            {
+                Debug.LogError($"[VstHost] Initialize failed: {result}");
+                return false;
+            }
+
+            SampleRate = sampleRate;
+            BlockSize = blockSize;
+            initialized = true;
+            Debug.Log($"[VstHost] Initialized (sampleRate={sampleRate}, blockSize={blockSize})");
+            return true;
+        }
+
+        public void Terminate()
+        {
+            if (!initialized) return;
+
+            var result = VstHostNative.VstHost_Terminate();
+            if (result != VstHostResult.Ok)
+                Debug.LogError($"[VstHost] Terminate failed: {result}");
+
+            loadedPlugins.Clear();
+            initialized = false;
+            Debug.Log("[VstHost] Terminated.");
+        }
+
+        public struct ScannedPlugin
+        {
+            public string Uid;
+            public string Name;
+            public string Vendor;
+            public string Category;
+            public string FilePath;
+        }
+
+        public List<ScannedPlugin> ScanFolder(string folderPath)
+        {
+            if (!initialized)
+            {
+                Debug.LogError("[VstHost] Not initialized. Call Initialize() first.");
+                return new List<ScannedPlugin>();
+            }
+
+            scanResults.Clear();
+
+            var result = VstHostNative.VstHost_ScanFolder(folderPath, OnScanCallback, IntPtr.Zero);
+            if (result != VstHostResult.Ok)
+            {
+                Debug.LogError($"[VstHost] ScanFolder failed: {result}");
+                return new List<ScannedPlugin>();
+            }
+
+            var copy = new List<ScannedPlugin>(scanResults);
+            scanResults.Clear();
+            return copy;
+        }
+
+        [ThreadStatic] private static List<ScannedPlugin> scanResults;
+
+        [MonoPInvokeCallback(typeof(ScanCallback))]
+        private static void OnScanCallback(IntPtr infoPtr, IntPtr userData)
+        {
+            if (scanResults == null)
+                scanResults = new List<ScannedPlugin>();
+
+            var info = Marshal.PtrToStructure<VstPluginInfo>(infoPtr);
+            scanResults.Add(new ScannedPlugin
+            {
+                Uid = info.Uid,
+                Name = info.Name,
+                Vendor = info.Vendor,
+                Category = info.Category,
+                FilePath = info.FilePath,
+            });
+        }
+
+        public int LoadPlugin(string filePath, string uid = null)
+        {
+            if (!initialized)
+            {
+                Debug.LogError("[VstHost] Not initialized.");
+                return -1;
+            }
+
+            var result = VstHostNative.VstHost_Load(filePath, uid, out var id);
+            if (result != VstHostResult.Ok)
+            {
+                Debug.LogError($"[VstHost] Load failed for '{filePath}': {result}");
+                return -1;
+            }
+
+            loadedPlugins[id] = filePath;
+            Debug.Log($"[VstHost] Loaded plugin id={id} from '{filePath}'");
+            return id;
+        }
+
+        public bool UnloadPlugin(int id)
+        {
+            if (!initialized)
+            {
+                Debug.LogError("[VstHost] Not initialized.");
+                return false;
+            }
+
+            var result = VstHostNative.VstHost_Unload(id);
+            if (result != VstHostResult.Ok)
+            {
+                Debug.LogError($"[VstHost] Unload failed for id={id}: {result}");
+                return false;
+            }
+
+            loadedPlugins.Remove(id);
+            Debug.Log($"[VstHost] Unloaded plugin id={id}");
+            return true;
+        }
+
+        public bool SendMidi1(int pluginId, byte status, byte data1, byte data2)
+        {
+            if (!initialized) return false;
+
+            var result = VstHostNative.VstHost_SendMidi1(pluginId, status, data1, data2);
+            if (result != VstHostResult.Ok)
+            {
+                Debug.LogWarning($"[VstHost] SendMidi1 failed for id={pluginId}: {result}");
+                return false;
+            }
+            return true;
+        }
+
+        public void Dispose()
+        {
+            Terminate();
+            if (instance == this)
+                instance = null;
+        }
+    }
+}
