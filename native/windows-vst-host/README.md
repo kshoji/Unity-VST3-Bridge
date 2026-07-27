@@ -64,3 +64,5 @@ Only the `pluginterfaces`, `base`, `public.sdk`, and `cmake` sub-submodules are
 required for building. `vstgui4`, `doc`, and `tutorials` are not needed.
 
 VST® is a registered trademark of Steinberg Media Technologies GmbH.
+
+License and acquisition details for the SDK: repository root `NOTICE.md`.

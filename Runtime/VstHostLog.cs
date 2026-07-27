@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using UnityEngine;
+using Debug = UnityEngine.Debug;
 
 namespace jp.kshoji.unity.vst3nativehost
 {

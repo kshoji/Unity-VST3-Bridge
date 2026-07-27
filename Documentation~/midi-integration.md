@@ -26,3 +26,5 @@ See also `audio-path.md`.
 MIDI 2.0 channel voice is down-converted to MIDI 1.0. SysEx and per-note messages are skipped (logged once).
 
 Do not put VST routing into MIDI core `midi2Plugins`; keep routing in this package.
+
+Also see `usage.md` for scan paths and install overview.
