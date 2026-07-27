@@ -232,6 +232,44 @@ namespace jp.kshoji.unity.vst3nativehost
             return true;
         }
 
+        /// <summary>Manual Note On (MIDI-less workflow). Channel 0–15.</summary>
+        public bool NoteOn(int pluginId, int channel, int note, int velocity = 100)
+        {
+            Midi1Util.NoteOn(channel, note, velocity, out var s, out var d1, out var d2);
+            return SendMidi1(pluginId, s, d1, d2);
+        }
+
+        /// <summary>Manual Note Off (MIDI-less workflow). Channel 0–15.</summary>
+        public bool NoteOff(int pluginId, int channel, int note, int velocity = 0)
+        {
+            Midi1Util.NoteOff(channel, note, velocity, out var s, out var d1, out var d2);
+            return SendMidi1(pluginId, s, d1, d2);
+        }
+
+        public bool ControlChange(int pluginId, int channel, int controller, int value)
+        {
+            Midi1Util.ControlChange(channel, controller, value, out var s, out var d1, out var d2);
+            return SendMidi1(pluginId, s, d1, d2);
+        }
+
+        public bool ProgramChange(int pluginId, int channel, int program)
+        {
+            Midi1Util.ProgramChange(channel, program, out var s, out var d1, out var d2);
+            return SendMidi1(pluginId, s, d1, d2);
+        }
+
+        public bool PitchBend(int pluginId, int channel, int amount14)
+        {
+            Midi1Util.PitchBend(channel, amount14, out var s, out var d1, out var d2);
+            return SendMidi1(pluginId, s, d1, d2);
+        }
+
+        public bool ChannelAftertouch(int pluginId, int channel, int pressure)
+        {
+            Midi1Util.ChannelAftertouch(channel, pressure, out var s, out var d1, out var d2);
+            return SendMidi1(pluginId, s, d1, d2);
+        }
+
         public void Dispose()
         {
             Terminate();

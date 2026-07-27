@@ -107,6 +107,24 @@ int main()
         return 1;
     }
     printf("Loaded without uid id=%d\n", id);
+
+    // Phase 4: enqueue MIDI 1.0 into the lock-free queue
+    if (VstHost_SendMidi1(id, 0x90, 60, 100) != kVstHostOk)
+    {
+        printf("FAIL: SendMidi1 NoteOn\n");
+        VstHost_Unload(id);
+        VstHost_Terminate();
+        return 1;
+    }
+    if (VstHost_SendMidi1(id, 0x80, 60, 0) != kVstHostOk)
+    {
+        printf("FAIL: SendMidi1 NoteOff\n");
+        VstHost_Unload(id);
+        VstHost_Terminate();
+        return 1;
+    }
+    printf("SendMidi1 NoteOn/NoteOff ok\n");
+
     VstHost_Unload(id);
 
     // Default-path scan (empty folder argument)
@@ -125,6 +143,6 @@ int main()
         return 1;
     }
 
-    printf("OK: Phase 3 smoke test passed\n");
+    printf("OK: Phase 3/4 smoke test passed\n");
     return 0;
 }

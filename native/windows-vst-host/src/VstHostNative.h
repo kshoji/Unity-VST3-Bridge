@@ -51,13 +51,13 @@ VSTHOST_API VstHostResult VstHost_Load(const char16_t* filePath,
                                        VstPluginId* outId);
 VSTHOST_API VstHostResult VstHost_Unload(VstPluginId id);
 
-// --- MIDI (stub until Phase 4/5) ---
+// --- MIDI (lock-free queue → drained in Process) ---
 VSTHOST_API VstHostResult VstHost_SendMidi1(VstPluginId id,
                                             uint8_t status,
                                             uint8_t data1,
                                             uint8_t data2);
 
-// --- Audio (stub until Phase 5) ---
+// --- Audio (Phase 5 completes Unity return path; drains MIDI queue) ---
 VSTHOST_API VstHostResult VstHost_Process(VstPluginId id,
                                           const float* inputL,
                                           const float* inputR,

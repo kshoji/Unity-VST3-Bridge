@@ -10,7 +10,11 @@
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
 #include "pluginterfaces/vst/ivsteditcontroller.h"
 #include "pluginterfaces/vst/ivstcomponent.h"
+#include "pluginterfaces/vst/ivstevents.h"
+#include "pluginterfaces/vst/ivstmidicontrollers.h"
 #include "pluginterfaces/base/ipluginbase.h"
+#include "public.sdk/source/vst/hosting/eventlist.h"
+#include "public.sdk/source/vst/hosting/parameterchanges.h"
 
 #include <atomic>
 #include <cstring>
@@ -39,18 +43,195 @@ struct HostState
     Steinberg::Vst::HostApplication hostApp;
 };
 
+// Lock-free SPSC ring for MIDI 1.0 short messages (producer: C# / MIDI adapter,
+// consumer: audio Process). Capacity must be power of two.
+struct Midi1Message
+{
+    uint8_t status = 0;
+    uint8_t data1 = 0;
+    uint8_t data2 = 0;
+};
+
+class Midi1Queue
+{
+public:
+    static constexpr uint32_t kCapacity = 1024;
+    static constexpr uint32_t kMask = kCapacity - 1;
+
+    bool tryPush(uint8_t status, uint8_t data1, uint8_t data2)
+    {
+        const uint32_t w = writeIndex.load(std::memory_order_relaxed);
+        const uint32_t next = (w + 1) & kMask;
+        if (next == readIndex.load(std::memory_order_acquire))
+            return false; // full — drop
+
+        slots[w] = Midi1Message{status, data1, data2};
+        writeIndex.store(next, std::memory_order_release);
+        return true;
+    }
+
+    bool tryPop(Midi1Message& out)
+    {
+        const uint32_t r = readIndex.load(std::memory_order_relaxed);
+        if (r == writeIndex.load(std::memory_order_acquire))
+            return false; // empty
+
+        out = slots[r];
+        readIndex.store((r + 1) & kMask, std::memory_order_release);
+        return true;
+    }
+
+    void clear()
+    {
+        readIndex.store(writeIndex.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    }
+
+private:
+    Midi1Message slots[kCapacity]{};
+    std::atomic<uint32_t> writeIndex{0};
+    std::atomic<uint32_t> readIndex{0};
+};
+
 struct PluginInstance
 {
     VST3::Hosting::Module::Ptr module;
     Steinberg::IPtr<Steinberg::Vst::IComponent> component;
     Steinberg::IPtr<Steinberg::Vst::IAudioProcessor> processor;
     Steinberg::IPtr<Steinberg::Vst::IEditController> controller;
+    Steinberg::IPtr<Steinberg::Vst::IMidiMapping> midiMapping;
     Steinberg::IPtr<Steinberg::Vst::ConnectionProxy> componentCP;
     Steinberg::IPtr<Steinberg::Vst::ConnectionProxy> controllerCP;
     bool controllerOwnedSeparately = false;
     bool active = false;
     bool processing = false;
+    Midi1Queue midiQueue;
+    Steinberg::Vst::EventList inputEvents{128};
+    Steinberg::Vst::ParameterChanges inputParams{64};
 };
+
+void tryBindMidiMapping(PluginInstance& inst)
+{
+    inst.midiMapping.reset();
+    if (!inst.controller)
+        return;
+
+    Steinberg::Vst::IMidiMapping* mapping = nullptr;
+    if (inst.controller->queryInterface(Steinberg::Vst::IMidiMapping::iid,
+                                         reinterpret_cast<void**>(&mapping))
+        == Steinberg::kResultTrue)
+    {
+        inst.midiMapping = Steinberg::owned(mapping);
+    }
+}
+
+void pushMappedParam(PluginInstance& inst,
+                     Steinberg::Vst::CtrlNumber ctrl,
+                     int16_t channel,
+                     Steinberg::Vst::ParamValue normalized)
+{
+    if (!inst.midiMapping)
+        return;
+
+    Steinberg::Vst::ParamID paramId = Steinberg::Vst::kNoParamId;
+    if (inst.midiMapping->getMidiControllerAssignment(0, channel, ctrl, paramId)
+            != Steinberg::kResultOk
+        || paramId == Steinberg::Vst::kNoParamId)
+        return;
+
+    Steinberg::int32 index = 0;
+    if (auto* queue = inst.inputParams.addParameterData(paramId, index))
+    {
+        Steinberg::int32 pointIndex = 0;
+        queue->addPoint(0, normalized, pointIndex);
+    }
+}
+
+// Convert queued MIDI 1.0 short messages into VST3 EventList / ParameterChanges.
+// Note / poly pressure → EventList. CC / channel pressure / pitch bend →
+// IMidiMapping parameter changes when available.
+// Called from the audio Process path (Phase 5); kept ready in Phase 4.
+[[maybe_unused]] void drainMidiQueue(PluginInstance& inst)
+{
+    inst.inputEvents.clear();
+    inst.inputParams.clearQueue();
+
+    Midi1Message msg{};
+    while (inst.midiQueue.tryPop(msg))
+    {
+        const uint8_t statusHi = static_cast<uint8_t>(msg.status & 0xF0);
+        const int16_t channel = static_cast<int16_t>(msg.status & 0x0F);
+
+        Steinberg::Vst::Event ev{};
+        ev.busIndex = 0;
+        ev.sampleOffset = 0;
+        ev.ppqPosition = 0;
+        ev.flags = Steinberg::Vst::Event::kIsLive;
+
+        switch (statusHi)
+        {
+        case 0x90: // Note On (velocity 0 = Note Off)
+            if (msg.data2 == 0)
+            {
+                ev.type = Steinberg::Vst::Event::kNoteOffEvent;
+                ev.noteOff.channel = channel;
+                ev.noteOff.pitch = msg.data1;
+                ev.noteOff.velocity = 0.f;
+                ev.noteOff.noteId = -1;
+                ev.noteOff.tuning = 0.f;
+            }
+            else
+            {
+                ev.type = Steinberg::Vst::Event::kNoteOnEvent;
+                ev.noteOn.channel = channel;
+                ev.noteOn.pitch = msg.data1;
+                ev.noteOn.tuning = 0.f;
+                ev.noteOn.velocity = msg.data2 / 127.f;
+                ev.noteOn.length = 0;
+                ev.noteOn.noteId = -1;
+            }
+            inst.inputEvents.addEvent(ev);
+            break;
+
+        case 0x80: // Note Off
+            ev.type = Steinberg::Vst::Event::kNoteOffEvent;
+            ev.noteOff.channel = channel;
+            ev.noteOff.pitch = msg.data1;
+            ev.noteOff.velocity = msg.data2 / 127.f;
+            ev.noteOff.noteId = -1;
+            ev.noteOff.tuning = 0.f;
+            inst.inputEvents.addEvent(ev);
+            break;
+
+        case 0xA0: // Polyphonic Aftertouch
+            ev.type = Steinberg::Vst::Event::kPolyPressureEvent;
+            ev.polyPressure.channel = channel;
+            ev.polyPressure.pitch = msg.data1;
+            ev.polyPressure.pressure = msg.data2 / 127.f;
+            ev.polyPressure.noteId = -1;
+            inst.inputEvents.addEvent(ev);
+            break;
+
+        case 0xB0: // Control Change
+            pushMappedParam(inst, msg.data1, channel, msg.data2 / 127.0);
+            break;
+
+        case 0xD0: // Channel Aftertouch
+            pushMappedParam(inst, Steinberg::Vst::kAfterTouch, channel, msg.data1 / 127.0);
+            break;
+
+        case 0xE0: // Pitch Bend
+        {
+            const int bend = msg.data1 | (msg.data2 << 7);
+            pushMappedParam(inst, Steinberg::Vst::kPitchBend, channel, bend / 16383.0);
+            break;
+        }
+
+        case 0xC0: // Program Change — deferred (needs program-list param)
+        default:
+            break;
+        }
+    }
+}
 
 std::mutex g_mutex;
 HostState g_state;
@@ -175,6 +356,10 @@ void destroyInstance(PluginInstance& inst)
     if (inst.controller && !controllerIsComponent && inst.controllerOwnedSeparately)
         inst.controller->terminate();
 
+    inst.midiQueue.clear();
+    inst.inputEvents.clear();
+    inst.inputParams.clearQueue();
+    inst.midiMapping.reset();
     inst.processor.reset();
     inst.controller.reset();
     inst.component.reset();
@@ -194,6 +379,7 @@ bool setupControllerAndConnect(PluginInstance& inst, const VST3::Hosting::Plugin
     {
         inst.controller = Steinberg::owned(ctrlFromComponent);
         inst.controllerOwnedSeparately = false;
+        tryBindMidiMapping(inst);
         return true;
     }
 
@@ -214,15 +400,17 @@ bool setupControllerAndConnect(PluginInstance& inst, const VST3::Hosting::Plugin
 
     auto compICP = FUnknownPtr<IConnectionPoint>(inst.component);
     auto ctrlICP = FUnknownPtr<IConnectionPoint>(inst.controller);
-    if (!compICP || !ctrlICP)
-        return true;
+    if (compICP && ctrlICP)
+    {
+        inst.componentCP = owned(new ConnectionProxy(compICP));
+        inst.controllerCP = owned(new ConnectionProxy(ctrlICP));
 
-    inst.componentCP = owned(new ConnectionProxy(compICP));
-    inst.controllerCP = owned(new ConnectionProxy(ctrlICP));
+        // Connection failure is non-fatal for load/unload.
+        inst.componentCP->connect(ctrlICP);
+        inst.controllerCP->connect(compICP);
+    }
 
-    // Connection failure is non-fatal for Phase 3 load/unload.
-    inst.componentCP->connect(ctrlICP);
-    inst.controllerCP->connect(compICP);
+    tryBindMidiMapping(inst);
     return true;
 }
 
@@ -502,7 +690,7 @@ VSTHOST_API VstHostResult VstHost_Unload(VstPluginId id)
 }
 
 // ---------------------------------------------------------------------------
-// MIDI / Audio stubs
+// MIDI (lock-free queue) / Audio (Phase 5 completes ring-buffer return path)
 // ---------------------------------------------------------------------------
 
 VSTHOST_API VstHostResult VstHost_SendMidi1(VstPluginId id,
@@ -510,10 +698,26 @@ VSTHOST_API VstHostResult VstHost_SendMidi1(VstPluginId id,
                                             uint8_t data1,
                                             uint8_t data2)
 {
-    (void)id;
-    (void)status;
-    (void)data1;
-    (void)data2;
+    // Lookup without holding g_mutex during enqueue so audio Process can proceed.
+    PluginInstance* inst = nullptr;
+    {
+        std::lock_guard lock(g_mutex);
+        if (!g_state.initialized)
+            return kVstHostErrorNotInitialized;
+        auto it = g_instances.find(id);
+        if (it == g_instances.end())
+            return kVstHostErrorInvalidId;
+        inst = it->second.get();
+    }
+
+    if (!inst->midiQueue.tryPush(status, data1, data2))
+    {
+        // Queue full: drop oldest then retry once (prefer live notes).
+        Midi1Message discarded{};
+        inst->midiQueue.tryPop(discarded);
+        if (!inst->midiQueue.tryPush(status, data1, data2))
+            return kVstHostErrorInvalidArgument;
+    }
     return kVstHostOk;
 }
 
@@ -529,7 +733,17 @@ VSTHOST_API VstHostResult VstHost_Process(VstPluginId id,
 
     std::memset(outputL, 0, sizeof(float) * static_cast<size_t>(numFrames));
     std::memset(outputR, 0, sizeof(float) * static_cast<size_t>(numFrames));
-    (void)id;
+
+    {
+        std::lock_guard lock(g_mutex);
+        if (!g_state.initialized)
+            return kVstHostErrorNotInitialized;
+        if (g_instances.find(id) == g_instances.end())
+            return kVstHostErrorInvalidId;
+    }
+
+    // Phase 5: drainMidiQueue(*inst) then processor->process(...).
+    // Do not drain here — that would discard notes before audio is wired.
     (void)inputL;
     (void)inputR;
     return kVstHostOk;

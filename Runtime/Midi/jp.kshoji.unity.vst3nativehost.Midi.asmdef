@@ -1,0 +1,19 @@
+{
+    "name": "jp.kshoji.unity.vst3nativehost.Midi",
+    "rootNamespace": "jp.kshoji.unity.vst3nativehost",
+    "references": [
+        "jp.kshoji.unity.vst3nativehost.Runtime",
+        "jp.kshoji.midi"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "FEATURE_MIDI_PLUGIN"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
