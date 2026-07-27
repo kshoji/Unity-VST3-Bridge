@@ -6,3 +6,4 @@
 - Initial package skeleton (Runtime, Editor, Tests, Samples~, Documentation~, Plugins).
 - Phase 8 docs: `NOTICE.md` SDK/trademark details, `Documentation~/usage.md`,
   `Documentation~/limitations.md`; plan canonical at `Documentation~/vst3-native-host-plan.md`.
+- Phase M prep: macOS placement in plan, `Plugins/macOS/` scaffold, `Documentation~/macos-portability.md`.

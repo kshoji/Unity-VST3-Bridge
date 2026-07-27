@@ -7,7 +7,7 @@ intentional product boundaries, not temporary bugs.
 |------|------------|
 | Plugin formats | **VST3 only**. VST2 and VST4 are out of scope. |
 | Host role | Unity is the **host**. This package is not shipped as a DAW-targeted VST. |
-| Platforms | **Windows** first: Editor Windows + Standalone Windows (x64; ARM64 DLL available). macOS / Linux / UWP are not implemented. |
+| Platforms | **Windows** first (Editor + Standalone x64/ARM64). **macOS** is Phase M (`Plugins/macOS/` scaffold + plan). Linux / UWP not implemented. |
 | Plugin GUI | Plugin-native editors (`IPlugView` / HWND embedding) are **not** supported. Use `VstHostParameterPanel` or your own UI on host parameters. |
 | MIDI 2.0 | UMP channel voice is **down-converted** to MIDI 1.0. High-resolution / per-note / SysEx are skipped (logged). |
 | Commercial plugins | Compatibility with arbitrary commercial `.vst3` plugins is **not guaranteed**. Smoke-tested with free/SDK samples (e.g. AGain, mda DX10). |

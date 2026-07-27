@@ -1,0 +1,8 @@
+# Keep directory in git; allow committed macOS native plugins.
+*
+!.gitignore
+!README.md
+!*.meta
+!*.bundle
+!*.bundle/**
+!*.bundle.meta
