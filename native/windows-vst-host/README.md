@@ -22,13 +22,22 @@ consumed by Unity via P/Invoke (`DllImport("VstHostNative")`).
 
 | Function | Description |
 |----------|-------------|
-| `VstHost_Initialize` | Set sample rate and block size |
+| `VstHost_Initialize` | Set sample rate and block size; install host context |
 | `VstHost_Terminate` | Release all instances and shut down |
-| `VstHost_ScanFolder` | Enumerate VST3 plugins in a folder |
-| `VstHost_Load` | Load a .vst3 and create an instance |
-| `VstHost_Unload` | Destroy a plugin instance |
+| `VstHost_ScanFolder` | Enumerate VST3 plugins (null/empty = Windows standard folders) |
+| `VstHost_Load` | Load a .vst3 and create an instance (optional class UID) |
+| `VstHost_Unload` | Destroy a plugin instance (fixed teardown order) |
 | `VstHost_SendMidi1` | Queue a MIDI 1.0 message (stub) |
 | `VstHost_Process` | Run audio processing (stub) |
+
+## Smoke test
+
+```powershell
+cmake --build build --config Release
+.\build\bin\Release\VstHostSmokeTest.exe
+```
+
+Expects SDK sample `again.vst3` under `C:\Program Files\Common Files\VST3`.
 
 ## VST3 SDK
 

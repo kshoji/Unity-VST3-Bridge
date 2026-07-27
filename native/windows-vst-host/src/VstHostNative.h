@@ -8,7 +8,6 @@
 #define VSTHOST_API extern "C" __attribute__((visibility("default")))
 #endif
 
-// Error codes
 enum VstHostResult : int32_t
 {
     kVstHostOk = 0,
@@ -21,16 +20,14 @@ enum VstHostResult : int32_t
     kVstHostErrorInvalidArgument = -7,
 };
 
-// Opaque plugin instance id
 using VstPluginId = int32_t;
 
-// Scan result entry (passed back via callback)
 struct VstPluginInfo
 {
-    const char16_t* uid;        // class UID as hex string
+    const char16_t* uid;
     const char16_t* name;
     const char16_t* vendor;
-    const char16_t* category;   // e.g. "Instrument" or "Fx"
+    const char16_t* category;
     const char16_t* filePath;
 };
 
@@ -41,23 +38,26 @@ VSTHOST_API VstHostResult VstHost_Initialize(int32_t sampleRate, int32_t blockSi
 VSTHOST_API VstHostResult VstHost_Terminate();
 
 // --- Scan ---
+// folderPath: UTF-16 path to scan recursively for .vst3 (bundle or flat).
+// If folderPath is null or empty, scans Windows standard VST3 folders.
 VSTHOST_API VstHostResult VstHost_ScanFolder(const char16_t* folderPath,
                                               ScanCallbackFn callback,
                                               void* userData);
 
 // --- Instance ---
+// uid: 32-char hex class UID (optional; null/empty = first Audio Module Class).
 VSTHOST_API VstHostResult VstHost_Load(const char16_t* filePath,
                                        const char16_t* uid,
                                        VstPluginId* outId);
 VSTHOST_API VstHostResult VstHost_Unload(VstPluginId id);
 
-// --- MIDI ---
+// --- MIDI (stub until Phase 4/5) ---
 VSTHOST_API VstHostResult VstHost_SendMidi1(VstPluginId id,
                                             uint8_t status,
                                             uint8_t data1,
                                             uint8_t data2);
 
-// --- Audio ---
+// --- Audio (stub until Phase 5) ---
 VSTHOST_API VstHostResult VstHost_Process(VstPluginId id,
                                           const float* inputL,
                                           const float* inputR,

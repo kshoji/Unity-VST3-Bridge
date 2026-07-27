@@ -1,22 +1,27 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.InteropServices;
 using AOT;
 using UnityEngine;
 
 namespace jp.kshoji.unity.vst3nativehost
 {
+    /// <summary>
+    /// High-level manager for discovering and instantiating VST3 plugins.
+    /// </summary>
     public sealed class VstHostManager : IDisposable
     {
         private static VstHostManager instance;
 
         private bool initialized;
-        private readonly Dictionary<int, string> loadedPlugins = new Dictionary<int, string>();
+        private readonly Dictionary<int, LoadedPluginInfo> loadedPlugins =
+            new Dictionary<int, LoadedPluginInfo>();
 
         public int SampleRate { get; private set; }
         public int BlockSize { get; private set; }
         public bool IsInitialized => initialized;
-        public IReadOnlyDictionary<int, string> LoadedPlugins => loadedPlugins;
+        public IReadOnlyDictionary<int, LoadedPluginInfo> LoadedPlugins => loadedPlugins;
 
         public static VstHostManager Instance
         {
@@ -29,6 +34,48 @@ namespace jp.kshoji.unity.vst3nativehost
         }
 
         private VstHostManager() { }
+
+        public readonly struct LoadedPluginInfo
+        {
+            public readonly string FilePath;
+            public readonly string Uid;
+
+            public LoadedPluginInfo(string filePath, string uid)
+            {
+                FilePath = filePath;
+                Uid = uid;
+            }
+        }
+
+        public struct ScannedPlugin
+        {
+            public string Uid;
+            public string Name;
+            public string Vendor;
+            public string Category;
+            public string FilePath;
+
+            public override string ToString() =>
+                $"{Name} ({Vendor}) [{Category}] uid={Uid} path={FilePath}";
+        }
+
+        /// <summary>
+        /// Windows standard VST3 folders (Common Files + user Common Files).
+        /// </summary>
+        public static IReadOnlyList<string> GetDefaultScanFolders()
+        {
+            var list = new List<string>(2);
+            var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonProgramFiles);
+            if (!string.IsNullOrEmpty(programData))
+                list.Add(Path.Combine(programData, "VST3"));
+
+            // FOLDERID_UserProgramFilesCommon ≈ %LOCALAPPDATA%\Programs\Common
+            var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (!string.IsNullOrEmpty(localAppData))
+                list.Add(Path.Combine(localAppData, "Programs", "Common", "VST3"));
+
+            return list;
+        }
 
         public bool Initialize(int sampleRate = 44100, int blockSize = 512)
         {
@@ -65,15 +112,17 @@ namespace jp.kshoji.unity.vst3nativehost
             Debug.Log("[VstHost] Terminated.");
         }
 
-        public struct ScannedPlugin
+        /// <summary>
+        /// Scan Windows standard VST3 folders (bundle + flat .vst3).
+        /// </summary>
+        public List<ScannedPlugin> Scan()
         {
-            public string Uid;
-            public string Name;
-            public string Vendor;
-            public string Category;
-            public string FilePath;
+            return ScanFolder(null);
         }
 
+        /// <summary>
+        /// Scan a specific folder recursively. Pass null/empty to use standard folders.
+        /// </summary>
         public List<ScannedPlugin> ScanFolder(string folderPath)
         {
             if (!initialized)
@@ -82,17 +131,20 @@ namespace jp.kshoji.unity.vst3nativehost
                 return new List<ScannedPlugin>();
             }
 
+            if (scanResults == null)
+                scanResults = new List<ScannedPlugin>();
             scanResults.Clear();
 
-            var result = VstHostNative.VstHost_ScanFolder(folderPath, OnScanCallback, IntPtr.Zero);
+            var result = VstHostNative.VstHost_ScanFolder(folderPath ?? string.Empty, OnScanCallback, IntPtr.Zero);
             if (result != VstHostResult.Ok)
             {
-                Debug.LogError($"[VstHost] ScanFolder failed: {result}");
+                Debug.LogError($"[VstHost] Scan failed: {result}");
                 return new List<ScannedPlugin>();
             }
 
             var copy = new List<ScannedPlugin>(scanResults);
             scanResults.Clear();
+            Debug.Log($"[VstHost] Scan found {copy.Count} plugin class(es).");
             return copy;
         }
 
@@ -115,7 +167,8 @@ namespace jp.kshoji.unity.vst3nativehost
             });
         }
 
-        public int LoadPlugin(string filePath, string uid = null)
+        /// <summary>Create a plugin instance. Returns id (&gt;= 1) or -1 on failure.</summary>
+        public int CreateInstance(string filePath, string uid = null)
         {
             if (!initialized)
             {
@@ -123,19 +176,26 @@ namespace jp.kshoji.unity.vst3nativehost
                 return -1;
             }
 
-            var result = VstHostNative.VstHost_Load(filePath, uid, out var id);
-            if (result != VstHostResult.Ok)
+            if (string.IsNullOrEmpty(filePath))
             {
-                Debug.LogError($"[VstHost] Load failed for '{filePath}': {result}");
+                Debug.LogError("[VstHost] CreateInstance: filePath is empty.");
                 return -1;
             }
 
-            loadedPlugins[id] = filePath;
-            Debug.Log($"[VstHost] Loaded plugin id={id} from '{filePath}'");
+            var result = VstHostNative.VstHost_Load(filePath, uid, out var id);
+            if (result != VstHostResult.Ok)
+            {
+                Debug.LogError($"[VstHost] CreateInstance failed for '{filePath}' uid='{uid}': {result}");
+                return -1;
+            }
+
+            loadedPlugins[id] = new LoadedPluginInfo(filePath, uid ?? string.Empty);
+            Debug.Log($"[VstHost] CreateInstance id={id} path='{filePath}' uid='{uid}'");
             return id;
         }
 
-        public bool UnloadPlugin(int id)
+        /// <summary>Destroy a previously created instance.</summary>
+        public bool DestroyInstance(int id)
         {
             if (!initialized)
             {
@@ -146,14 +206,18 @@ namespace jp.kshoji.unity.vst3nativehost
             var result = VstHostNative.VstHost_Unload(id);
             if (result != VstHostResult.Ok)
             {
-                Debug.LogError($"[VstHost] Unload failed for id={id}: {result}");
+                Debug.LogError($"[VstHost] DestroyInstance failed for id={id}: {result}");
                 return false;
             }
 
             loadedPlugins.Remove(id);
-            Debug.Log($"[VstHost] Unloaded plugin id={id}");
+            Debug.Log($"[VstHost] DestroyInstance id={id}");
             return true;
         }
+
+        // Backward-compatible aliases
+        public int LoadPlugin(string filePath, string uid = null) => CreateInstance(filePath, uid);
+        public bool UnloadPlugin(int id) => DestroyInstance(id);
 
         public bool SendMidi1(int pluginId, byte status, byte data1, byte data2)
         {

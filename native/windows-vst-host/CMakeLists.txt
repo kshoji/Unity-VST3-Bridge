@@ -49,6 +49,7 @@ add_library(sdk_hosting STATIC
     "${public_sdk_SOURCE_DIR}/source/vst/vstinitiids.cpp"
     "${public_sdk_SOURCE_DIR}/source/vst/utility/stringconvert.cpp"
     "${public_sdk_SOURCE_DIR}/source/common/commonstringconvert.cpp"
+    "${public_sdk_SOURCE_DIR}/source/common/threadchecker_win32.cpp"
 )
 target_include_directories(sdk_hosting PUBLIC "${SDK_ROOT}" "${public_sdk_SOURCE_DIR}")
 target_link_libraries(sdk_hosting PUBLIC base pluginterfaces)
@@ -83,3 +84,16 @@ install(TARGETS VstHostNative
     RUNTIME DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/../../Plugins/Windows/x86_64"
     LIBRARY DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/../../Plugins/Windows/x86_64"
 )
+
+# --- Smoke test (dev only) ---
+add_executable(VstHostSmokeTest tools/SmokeTest.cpp)
+target_include_directories(VstHostSmokeTest PRIVATE src)
+target_link_libraries(VstHostSmokeTest PRIVATE VstHostNative)
+set_target_properties(VstHostSmokeTest PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+if(WIN32)
+    target_compile_definitions(VstHostSmokeTest PRIVATE
+        _UNICODE UNICODE NOMINMAX WIN32_LEAN_AND_MEAN
+    )
+endif()
