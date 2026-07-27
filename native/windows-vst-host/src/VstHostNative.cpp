@@ -19,12 +19,17 @@
 #include "public.sdk/source/common/memorystream.h"
 #include "pluginterfaces/vst/ivstprocesscontext.h"
 #include "pluginterfaces/vst/ivstunits.h"
+#include "public.sdk/source/vst/vstaudioprocessoralgo.h"
 
 #include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
+#include <memory>
 #include <mutex>
+#include <shared_mutex>
+#include <thread>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -154,13 +159,16 @@ struct PluginInstance
     Steinberg::Vst::ParameterChangeTransfer paramTransfer{256};
     Steinberg::Vst::HostProcessData processData;
     Steinberg::Vst::ProcessContext processContext{};
-    std::vector<float> silentScratch;
+    // Per-channel scratch so input/output / aux buses never alias the same buffer.
+    std::vector<std::vector<float>> scratchChannels;
     bool processPrepared = false;
     int32_t audioInputChannels = 0;
     int32_t audioOutputChannels = 0;
     // Cached program-change parameter (ParamID) when present; kNoParamId otherwise.
     Steinberg::Vst::ParamID programChangeParamId = Steinberg::Vst::kNoParamId;
     int32_t programChangeStepCount = 0;
+    std::atomic<int> activeProcesses{0};
+    std::string modulePath;
 };
 
 Steinberg::tresult PLUGIN_API HostComponentHandler::performEdit(
@@ -326,9 +334,133 @@ void drainMidiQueue(PluginInstance& inst)
 }
 
 std::mutex g_mutex;
+std::shared_mutex g_audioLifecycleMutex; // shared: Process/SendMidi1, unique: Load/Unload/Terminate
 HostState g_state;
 std::atomic<VstPluginId> g_nextId{1};
+
+struct ModuleCacheEntry
+{
+    VST3::Hosting::Module::Ptr module;
+    int refCount = 0;
+};
+
+std::unordered_map<std::string, ModuleCacheEntry> g_moduleCache;
 std::unordered_map<VstPluginId, std::unique_ptr<PluginInstance>> g_instances;
+
+void destroyInstance(PluginInstance& inst);
+void finishDestroyInstance(std::unique_ptr<PluginInstance> inst);
+
+std::string normalizeModulePath(const std::string& path)
+{
+    std::error_code ec;
+    const auto canonical = std::filesystem::weakly_canonical(std::filesystem::u8path(path), ec);
+    return ec ? path : canonical.generic_u8string();
+}
+
+VST3::Hosting::Module::Ptr acquireModule(const std::string& path, std::string& errorStr)
+{
+    const auto key = normalizeModulePath(path);
+    auto& entry = g_moduleCache[key];
+    if (entry.module)
+    {
+        entry.refCount++;
+        return entry.module;
+    }
+
+    auto mod = VST3::Hosting::Module::create(path, errorStr);
+    if (!mod)
+        return {};
+    entry.module = mod;
+    entry.refCount = 1;
+    return mod;
+}
+
+void releaseModule(const VST3::Hosting::Module::Ptr& module)
+{
+    if (!module)
+        return;
+
+    for (auto& [key, entry] : g_moduleCache)
+    {
+        if (entry.module.get() == module.get())
+        {
+            if (entry.refCount > 0)
+                entry.refCount--;
+            // Keep Module::Ptr until Terminate so FreeLibrary cannot race the audio thread.
+            return;
+        }
+    }
+}
+
+void finishDestroyInstance(std::unique_ptr<PluginInstance> inst)
+{
+    if (!inst)
+        return;
+
+    // Wait until audio/MIDI borrowers leave. Teardown always runs on this thread
+    // (never from OnAudioFilterRead).
+    for (int spins = 0; inst->activeProcesses.load(std::memory_order_acquire) > 0; ++spins)
+    {
+        if (spins < 40)
+            std::this_thread::yield();
+        else
+            std::this_thread::sleep_for(std::chrono::microseconds(100));
+    }
+
+    destroyInstance(*inst);
+}
+
+/// Borrow an instance while incrementing activeProcesses under g_mutex.
+struct InstanceBorrow
+{
+    PluginInstance* inst = nullptr;
+
+    InstanceBorrow() = default;
+    explicit InstanceBorrow(VstPluginId id)
+    {
+        std::lock_guard lock(g_mutex);
+        if (!g_state.initialized)
+            return;
+        auto it = g_instances.find(id);
+        if (it == g_instances.end())
+            return;
+        inst = it->second.get();
+        inst->activeProcesses.fetch_add(1, std::memory_order_acq_rel);
+    }
+
+    InstanceBorrow(const InstanceBorrow&) = delete;
+    InstanceBorrow& operator=(const InstanceBorrow&) = delete;
+
+    InstanceBorrow(InstanceBorrow&& other) noexcept : inst(other.inst)
+    {
+        other.inst = nullptr;
+    }
+
+    InstanceBorrow& operator=(InstanceBorrow&& other) noexcept
+    {
+        if (this != &other)
+        {
+            release();
+            inst = other.inst;
+            other.inst = nullptr;
+        }
+        return *this;
+    }
+
+    ~InstanceBorrow() { release(); }
+
+    explicit operator bool() const { return inst != nullptr; }
+    PluginInstance* operator->() const { return inst; }
+    PluginInstance& operator*() const { return *inst; }
+
+    void release()
+    {
+        if (!inst)
+            return;
+        inst->activeProcesses.fetch_sub(1, std::memory_order_acq_rel);
+        inst = nullptr;
+    }
+};
 
 bool prepareAudioProcess(PluginInstance& inst)
 {
@@ -336,7 +468,7 @@ bool prepareAudioProcess(PluginInstance& inst)
 
     inst.processData.unprepare();
     inst.processPrepared = false;
-    inst.silentScratch.assign(static_cast<size_t>(g_state.blockSize), 0.f);
+    inst.scratchChannels.clear();
 
     // bufferSamples = 0 → allocate bus/channel pointer slots; we bind external buffers each Process.
     if (!inst.processData.prepare(*inst.component, 0, kSample32))
@@ -366,6 +498,16 @@ bool prepareAudioProcess(PluginInstance& inst)
     if (inst.component->getBusCount(kAudio, kOutput) > 0
         && inst.component->getBusInfo(kAudio, kOutput, 0, info) == Steinberg::kResultOk)
         inst.audioOutputChannels = info.channelCount;
+
+    // One scratch plane per channel across all buses (main L/R use host buffers instead).
+    int32_t scratchNeed = 0;
+    for (int32_t b = 0; b < inst.processData.numInputs; ++b)
+        scratchNeed += inst.processData.inputs[b].numChannels;
+    for (int32_t b = 0; b < inst.processData.numOutputs; ++b)
+        scratchNeed += inst.processData.outputs[b].numChannels;
+    inst.scratchChannels.resize(static_cast<size_t>(std::max(scratchNeed, 1)));
+    for (auto& ch : inst.scratchChannels)
+        ch.assign(static_cast<size_t>(g_state.blockSize), 0.f);
 
     inst.processPrepared = true;
     return true;
@@ -498,7 +640,7 @@ void destroyInstance(PluginInstance& inst)
         inst.processData.unprepare();
         inst.processPrepared = false;
     }
-    inst.silentScratch.clear();
+    inst.scratchChannels.clear();
     inst.paramTransfer.removeChanges();
     if (inst.controller)
         inst.controller->setComponentHandler(nullptr);
@@ -508,7 +650,9 @@ void destroyInstance(PluginInstance& inst)
     inst.processor.reset();
     inst.controller.reset();
     inst.component.reset();
-    inst.module.reset();
+    releaseModule(inst.module);
+    inst.module = nullptr;
+    inst.modulePath.clear();
 }
 
 bool setupControllerAndConnect(PluginInstance& inst, const VST3::Hosting::PluginFactory& factory)
@@ -608,16 +752,30 @@ VSTHOST_API VstHostResult VstHost_Initialize(int32_t sampleRate, int32_t blockSi
 
 VSTHOST_API VstHostResult VstHost_Terminate()
 {
-    std::lock_guard lock(g_mutex);
-    if (!g_state.initialized)
-        return kVstHostErrorNotInitialized;
+    // Block audio/MIDI borrowers before tearing down instances or FreeLibrary.
+    std::unique_lock audioLock(g_audioLifecycleMutex);
 
-    for (auto& [id, inst] : g_instances)
-        destroyInstance(*inst);
-    g_instances.clear();
+    std::vector<std::unique_ptr<PluginInstance>> pending;
+    {
+        std::lock_guard lock(g_mutex);
+        if (!g_state.initialized)
+            return kVstHostErrorNotInitialized;
 
-    Steinberg::Vst::PluginContextFactory::instance().setPluginContext(nullptr);
-    g_state.initialized = false;
+        pending.reserve(g_instances.size());
+        for (auto& [id, inst] : g_instances)
+            pending.push_back(std::move(inst));
+        g_instances.clear();
+    }
+
+    for (auto& inst : pending)
+        finishDestroyInstance(std::move(inst));
+
+    {
+        std::lock_guard lock(g_mutex);
+        g_moduleCache.clear(); // FreeLibrary only here, after Process has stopped.
+        Steinberg::Vst::PluginContextFactory::instance().setPluginContext(nullptr);
+        g_state.initialized = false;
+    }
     return kVstHostOk;
 }
 
@@ -666,18 +824,17 @@ VSTHOST_API VstHostResult VstHost_Load(const char16_t* filePath,
     if (!filePath || !outId)
         return kVstHostErrorInvalidArgument;
 
+    // Exclusive: do not create/destroy while any Process is mid-flight.
+    std::unique_lock audioLock(g_audioLifecycleMutex);
     std::lock_guard lock(g_mutex);
     if (!g_state.initialized)
         return kVstHostErrorNotInitialized;
 
     const std::string path = toUtf8(filePath);
     std::string errorStr;
-    auto mod = VST3::Hosting::Module::create(path, errorStr);
+    auto mod = acquireModule(path, errorStr);
     if (!mod)
-    {
-        // Keep lightweight; detailed logging belongs in host tooling.
         return kVstHostErrorLoadFailed;
-    }
 
     auto factory = mod->getFactory();
     const auto classInfos = factory.classInfos();
@@ -732,6 +889,7 @@ VSTHOST_API VstHostResult VstHost_Load(const char16_t* filePath,
 
     auto inst = std::make_unique<PluginInstance>();
     inst->module = mod;
+    inst->modulePath = path;
 
     Steinberg::FUnknown* hostCtx = &g_state.hostApp;
     inst->component = factory.createInstance<Steinberg::Vst::IComponent>(targetClass->ID());
@@ -747,14 +905,14 @@ VSTHOST_API VstHostResult VstHost_Load(const char16_t* filePath,
 
     if (!setupControllerAndConnect(*inst, factory))
     {
-        destroyInstance(*inst);
+        finishDestroyInstance(std::move(inst));
         return kVstHostErrorLoadFailed;
     }
 
     inst->processor = Steinberg::FUnknownPtr<Steinberg::Vst::IAudioProcessor>(inst->component);
     if (!inst->processor)
     {
-        destroyInstance(*inst);
+        finishDestroyInstance(std::move(inst));
         return kVstHostErrorLoadFailed;
     }
 
@@ -766,19 +924,34 @@ VSTHOST_API VstHostResult VstHost_Load(const char16_t* filePath,
 
     if (inst->processor->setupProcessing(setup) != Steinberg::kResultOk)
     {
-        destroyInstance(*inst);
+        finishDestroyInstance(std::move(inst));
         return kVstHostErrorLoadFailed;
     }
 
-    // Arrange default stereo audio buses when available.
+    // Arrange buses: main stereo (or mono), keep Aux buses mono (e.g. AGain SideChain).
     {
         using namespace Steinberg::Vst;
-        SpeakerArrangement inArr = SpeakerArr::kStereo;
-        SpeakerArrangement outArr = SpeakerArr::kStereo;
         const int32_t inBuses = inst->component->getBusCount(kAudio, kInput);
         const int32_t outBuses = inst->component->getBusCount(kAudio, kOutput);
-        std::vector<SpeakerArrangement> inputs(static_cast<size_t>(std::max(inBuses, 0)), inArr);
-        std::vector<SpeakerArrangement> outputs(static_cast<size_t>(std::max(outBuses, 0)), outArr);
+        std::vector<SpeakerArrangement> inputs(static_cast<size_t>(std::max(inBuses, 0)));
+        std::vector<SpeakerArrangement> outputs(static_cast<size_t>(std::max(outBuses, 0)));
+        BusInfo bi{};
+        for (int32_t i = 0; i < inBuses; ++i)
+        {
+            if (inst->component->getBusInfo(kAudio, kInput, i, bi) == Steinberg::kResultOk
+                && bi.busType == kAux)
+                inputs[static_cast<size_t>(i)] = SpeakerArr::kMono;
+            else
+                inputs[static_cast<size_t>(i)] = SpeakerArr::kStereo;
+        }
+        for (int32_t i = 0; i < outBuses; ++i)
+        {
+            if (inst->component->getBusInfo(kAudio, kOutput, i, bi) == Steinberg::kResultOk
+                && bi.busType == kAux)
+                outputs[static_cast<size_t>(i)] = SpeakerArr::kMono;
+            else
+                outputs[static_cast<size_t>(i)] = SpeakerArr::kStereo;
+        }
         if (inBuses > 0 || outBuses > 0)
         {
             inst->processor->setBusArrangements(
@@ -807,7 +980,7 @@ VSTHOST_API VstHostResult VstHost_Load(const char16_t* filePath,
     // data are fully wired (Phase 5). Treat setProcessing failure as soft.
     if (inst->component->setActive(true) != Steinberg::kResultOk)
     {
-        destroyInstance(*inst);
+        finishDestroyInstance(std::move(inst));
         return kVstHostErrorLoadFailed;
     }
     inst->active = true;
@@ -818,7 +991,7 @@ VSTHOST_API VstHostResult VstHost_Load(const char16_t* filePath,
 
     if (!prepareAudioProcess(*inst))
     {
-        destroyInstance(*inst);
+        finishDestroyInstance(std::move(inst));
         return kVstHostErrorLoadFailed;
     }
 
@@ -835,16 +1008,24 @@ VSTHOST_API VstHostResult VstHost_Load(const char16_t* filePath,
 
 VSTHOST_API VstHostResult VstHost_Unload(VstPluginId id)
 {
-    std::lock_guard lock(g_mutex);
-    if (!g_state.initialized)
-        return kVstHostErrorNotInitialized;
+    // Wait until no Process/SendMidi1 is using any instance, then destroy.
+    std::unique_lock audioLock(g_audioLifecycleMutex);
 
-    auto it = g_instances.find(id);
-    if (it == g_instances.end())
-        return kVstHostErrorInvalidId;
+    std::unique_ptr<PluginInstance> doomed;
+    {
+        std::lock_guard lock(g_mutex);
+        if (!g_state.initialized)
+            return kVstHostErrorNotInitialized;
 
-    destroyInstance(*it->second);
-    g_instances.erase(it);
+        auto it = g_instances.find(id);
+        if (it == g_instances.end())
+            return kVstHostErrorInvalidId;
+
+        doomed = std::move(it->second);
+        g_instances.erase(it);
+    }
+
+    finishDestroyInstance(std::move(doomed));
     return kVstHostOk;
 }
 
@@ -857,28 +1038,55 @@ VSTHOST_API VstHostResult VstHost_SendMidi1(VstPluginId id,
                                             uint8_t data1,
                                             uint8_t data2)
 {
-    // Lookup without holding g_mutex during enqueue so audio Process can proceed.
-    PluginInstance* inst = nullptr;
-    {
-        std::lock_guard lock(g_mutex);
-        if (!g_state.initialized)
-            return kVstHostErrorNotInitialized;
-        auto it = g_instances.find(id);
-        if (it == g_instances.end())
-            return kVstHostErrorInvalidId;
-        inst = it->second.get();
-    }
+    std::shared_lock audioLock(g_audioLifecycleMutex);
+    InstanceBorrow borrow(id);
+    if (!borrow)
+        return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
 
-    if (!inst->midiQueue.tryPush(status, data1, data2))
+    if (!borrow->midiQueue.tryPush(status, data1, data2))
     {
         // Queue full: drop oldest then retry once (prefer live notes).
         Midi1Message discarded{};
-        inst->midiQueue.tryPop(discarded);
-        if (!inst->midiQueue.tryPush(status, data1, data2))
+        borrow->midiQueue.tryPop(discarded);
+        if (!borrow->midiQueue.tryPush(status, data1, data2))
             return kVstHostErrorInvalidArgument;
     }
     return kVstHostOk;
 }
+
+namespace {
+
+// SEH must not share a frame with C++ objects that need unwinding.
+Steinberg::tresult safeProcessorProcess(Steinberg::Vst::IAudioProcessor* processor,
+                                         Steinberg::Vst::ProcessData& data)
+{
+#if defined(_MSC_VER)
+    __try
+    {
+        return processor->process(data);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        return Steinberg::kResultFalse;
+    }
+#else
+    return processor->process(data);
+#endif
+}
+
+float* ensureScratchChannel(PluginInstance& inst, size_t index, int32_t numFrames)
+{
+    if (index >= inst.scratchChannels.size())
+        inst.scratchChannels.resize(index + 1);
+    auto& ch = inst.scratchChannels[index];
+    if (static_cast<int32_t>(ch.size()) < numFrames)
+        ch.assign(static_cast<size_t>(numFrames), 0.f);
+    else
+        std::memset(ch.data(), 0, sizeof(float) * static_cast<size_t>(numFrames));
+    return ch.data();
+}
+
+} // namespace
 
 VSTHOST_API VstHostResult VstHost_Process(VstPluginId id,
                                           const float* inputL,
@@ -890,16 +1098,12 @@ VSTHOST_API VstHostResult VstHost_Process(VstPluginId id,
     if (!outputL || !outputR || numFrames <= 0)
         return kVstHostErrorInvalidArgument;
 
-    PluginInstance* inst = nullptr;
-    {
-        std::lock_guard lock(g_mutex);
-        if (!g_state.initialized)
-            return kVstHostErrorNotInitialized;
-        auto it = g_instances.find(id);
-        if (it == g_instances.end())
-            return kVstHostErrorInvalidId;
-        inst = it->second.get();
-    }
+    std::shared_lock audioLock(g_audioLifecycleMutex);
+    InstanceBorrow borrow(id);
+    if (!borrow)
+        return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
+
+    PluginInstance* inst = borrow.inst;
 
     if (!inst->processPrepared || !inst->processor)
     {
@@ -933,53 +1137,57 @@ VSTHOST_API VstHostResult VstHost_Process(VstPluginId id,
     inst->processContext.projectTimeSamples = inst->processContext.continousTimeSamples;
     inst->processData.numSamples = numFrames;
 
-    float* silence = inst->silentScratch.data();
-    if (static_cast<int32_t>(inst->silentScratch.size()) < numFrames)
+    size_t scratchIndex = 0;
+    auto nextScratch = [&]() -> float* {
+        return ensureScratchChannel(*inst, scratchIndex++, numFrames);
+    };
+
+    // Bind EVERY audio input bus. Unbound side-chain buses crash many plugins (e.g. AGain SideChain).
+    // silenceFlags must equal getChannelMask(n) — plugins compare equality, not bit-subset.
+    for (int32_t b = 0; b < inst->processData.numInputs; ++b)
     {
-        inst->silentScratch.assign(static_cast<size_t>(numFrames), 0.f);
-        silence = inst->silentScratch.data();
-    }
-    else
-    {
-        std::memset(silence, 0, sizeof(float) * static_cast<size_t>(numFrames));
+        auto& bus = inst->processData.inputs[b];
+        if (!bus.channelBuffers32)
+            continue;
+        for (int32_t c = 0; c < bus.numChannels; ++c)
+        {
+            if (b == 0 && c == 0 && inputL)
+                bus.channelBuffers32[c] = const_cast<float*>(inputL);
+            else if (b == 0 && c == 1 && (inputR || inputL))
+                bus.channelBuffers32[c] = const_cast<float*>(inputR ? inputR : inputL);
+            else
+                bus.channelBuffers32[c] = nextScratch();
+        }
+        const bool mainHasAudio = (b == 0 && inputL != nullptr);
+        bus.silenceFlags = mainHasAudio ? 0 : getChannelMask(bus.numChannels);
     }
 
-    const float* inL = inputL ? inputL : silence;
-    const float* inR = inputR ? inputR : (inputL ? inputL : silence);
-
-    // Bind first audio input bus (effect) or leave silent / absent (instrument).
-    if (inst->processData.numInputs > 0)
-    {
-        auto& bus = inst->processData.inputs[0];
-        if (bus.numChannels >= 1 && bus.channelBuffers32)
-            bus.channelBuffers32[0] = const_cast<float*>(inL);
-        if (bus.numChannels >= 2 && bus.channelBuffers32)
-            bus.channelBuffers32[1] = const_cast<float*>(inR);
-        for (int32_t c = 2; c < bus.numChannels; ++c)
-            bus.channelBuffers32[c] = silence;
-        bus.silenceFlags = inputL ? 0 : HostProcessData::kAllChannelsSilent;
-    }
-
-    // Bind first audio output bus (stereo preferred).
-    if (inst->processData.numOutputs > 0)
-    {
-        auto& bus = inst->processData.outputs[0];
-        if (bus.numChannels >= 1 && bus.channelBuffers32)
-            bus.channelBuffers32[0] = outputL;
-        if (bus.numChannels >= 2 && bus.channelBuffers32)
-            bus.channelBuffers32[1] = outputR;
-        for (int32_t c = 2; c < bus.numChannels; ++c)
-            bus.channelBuffers32[c] = silence;
-        bus.silenceFlags = 0;
-    }
-    else
+    // Bind EVERY audio output bus; only bus 0 carries host-visible L/R.
+    if (inst->processData.numOutputs <= 0)
     {
         std::memset(outputL, 0, sizeof(float) * static_cast<size_t>(numFrames));
         std::memset(outputR, 0, sizeof(float) * static_cast<size_t>(numFrames));
         return kVstHostErrorProcessFailed;
     }
 
-    const auto result = inst->processor->process(inst->processData);
+    for (int32_t b = 0; b < inst->processData.numOutputs; ++b)
+    {
+        auto& bus = inst->processData.outputs[b];
+        if (!bus.channelBuffers32)
+            continue;
+        for (int32_t c = 0; c < bus.numChannels; ++c)
+        {
+            if (b == 0 && c == 0)
+                bus.channelBuffers32[c] = outputL;
+            else if (b == 0 && c == 1)
+                bus.channelBuffers32[c] = outputR;
+            else
+                bus.channelBuffers32[c] = nextScratch();
+        }
+        bus.silenceFlags = 0;
+    }
+
+    const auto result = safeProcessorProcess(inst->processor, inst->processData);
     inst->processContext.continousTimeSamples += numFrames;
 
     // Mono out → duplicate to R.
@@ -987,15 +1195,19 @@ VSTHOST_API VstHostResult VstHost_Process(VstPluginId id,
         std::memcpy(outputR, outputL, sizeof(float) * static_cast<size_t>(numFrames));
 
     // Unbind pointers so destroy cannot leave dangling refs.
-    if (inst->processData.numInputs > 0)
+    for (int32_t b = 0; b < inst->processData.numInputs; ++b)
     {
-        auto& bus = inst->processData.inputs[0];
+        auto& bus = inst->processData.inputs[b];
+        if (!bus.channelBuffers32)
+            continue;
         for (int32_t c = 0; c < bus.numChannels; ++c)
             bus.channelBuffers32[c] = nullptr;
     }
-    if (inst->processData.numOutputs > 0)
+    for (int32_t b = 0; b < inst->processData.numOutputs; ++b)
     {
-        auto& bus = inst->processData.outputs[0];
+        auto& bus = inst->processData.outputs[b];
+        if (!bus.channelBuffers32)
+            continue;
         for (int32_t c = 0; c < bus.numChannels; ++c)
             bus.channelBuffers32[c] = nullptr;
     }
@@ -1011,16 +1223,7 @@ VSTHOST_API VstHostResult VstHost_Process(VstPluginId id,
 
 namespace {
 
-PluginInstance* findInstance(VstPluginId id)
-{
-    std::lock_guard lock(g_mutex);
-    if (!g_state.initialized)
-        return nullptr;
-    auto it = g_instances.find(id);
-    if (it == g_instances.end())
-        return nullptr;
-    return it->second.get();
-}
+// Prefer InstanceBorrow for any use that continues after releasing g_mutex.
 
 void copyString128(char16_t* dst, size_t dstChars, const Steinberg::Vst::String128 src)
 {
@@ -1060,7 +1263,7 @@ VSTHOST_API VstHostResult VstHost_GetParameterCount(VstPluginId id, int32_t* out
     if (!outCount)
         return kVstHostErrorInvalidArgument;
     *outCount = 0;
-    auto* inst = findInstance(id);
+    InstanceBorrow inst(id);
     if (!inst)
         return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
     if (!inst->controller)
@@ -1075,7 +1278,7 @@ VSTHOST_API VstHostResult VstHost_GetParameterInfo(VstPluginId id,
 {
     if (!outInfo || index < 0)
         return kVstHostErrorInvalidArgument;
-    auto* inst = findInstance(id);
+    InstanceBorrow inst(id);
     if (!inst)
         return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
     if (!inst->controller)
@@ -1103,7 +1306,7 @@ VSTHOST_API VstHostResult VstHost_GetParameterNormalized(VstPluginId id,
     if (!outValue)
         return kVstHostErrorInvalidArgument;
     *outValue = 0.0;
-    auto* inst = findInstance(id);
+    InstanceBorrow inst(id);
     if (!inst)
         return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
     if (!inst->controller)
@@ -1121,7 +1324,7 @@ VSTHOST_API VstHostResult VstHost_SetParameterNormalized(VstPluginId id,
     if (value > 1.0)
         value = 1.0;
 
-    auto* inst = findInstance(id);
+    InstanceBorrow inst(id);
     if (!inst)
         return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
     if (!inst->controller)
@@ -1139,7 +1342,7 @@ VSTHOST_API VstHostResult VstHost_GetProgramCount(VstPluginId id, int32_t* outCo
     if (!outCount)
         return kVstHostErrorInvalidArgument;
     *outCount = 0;
-    auto* inst = findInstance(id);
+    InstanceBorrow inst(id);
     if (!inst)
         return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
 
@@ -1174,7 +1377,7 @@ VSTHOST_API VstHostResult VstHost_GetProgramName(VstPluginId id,
         return kVstHostErrorInvalidArgument;
     outName[0] = 0;
 
-    auto* inst = findInstance(id);
+    InstanceBorrow inst(id);
     if (!inst)
         return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
 
@@ -1217,7 +1420,7 @@ VSTHOST_API VstHostResult VstHost_SetProgram(VstPluginId id, int32_t index)
 {
     if (index < 0)
         return kVstHostErrorInvalidArgument;
-    auto* inst = findInstance(id);
+    InstanceBorrow inst(id);
     if (!inst)
         return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
     if (!inst->controller || inst->programChangeParamId == Steinberg::Vst::kNoParamId)
@@ -1238,7 +1441,7 @@ VSTHOST_API VstHostResult VstHost_GetState(VstPluginId id,
         return kVstHostErrorInvalidArgument;
     *outWritten = 0;
 
-    auto* inst = findInstance(id);
+    InstanceBorrow inst(id);
     if (!inst)
         return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
     if (!inst->component)
@@ -1286,7 +1489,7 @@ VSTHOST_API VstHostResult VstHost_SetState(VstPluginId id,
     if (!buffer || size < 12)
         return kVstHostErrorInvalidArgument;
 
-    auto* inst = findInstance(id);
+    InstanceBorrow inst(id);
     if (!inst)
         return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
     if (!inst->component)

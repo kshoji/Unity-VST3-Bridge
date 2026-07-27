@@ -20,13 +20,15 @@ No `?path=` suffix is needed — `package.json` is at the repository root.
 - `Samples~/` — importable samples
 - `Documentation~/` — package documentation
 - `Tests/` — optional package tests
-- `native/` — (future) native C++ source for `VstHostNative.dll`
+- `native/` — C++ source for `VstHostNative.dll` (repo only; excluded from registry via `.npmignore`)
 
 ## Status
 
-Phases 0–6 are implemented on branch `feature/vst3-native-host-20260727`:
-native host, MIDI, audio return, parameters / state / simple IMGUI panel.
+Phases 0–7 are implemented on branch `feature/vst3-native-host-20260727`:
+native host, MIDI, audio return, parameters / state / IMGUI panel, sample scene, IL2CPP Win64 verify.
 Plugin-native GUI is not hosted.
+
+Import **VST3 Host Sample** from Package Manager, or follow `Documentation~/verification.md`.
 
 ## Audio (Path B)
 
@@ -44,6 +46,13 @@ filter.PluginId = id;
 filter.Mode = VstHostAudioFilter.ProcessMode.Instrument;
 host.NoteOn(id, 0, 60, 100);
 ```
+
+## Debug tracing (load / lifecycle)
+
+Informational load logs (`CreateInstance` / `DestroyInstance` / Initialize /
+Terminate / Scan) are off by default. To enable them, add scripting define
+**`VSTHOST_DEBUG`** (Project Settings → Player → Other Settings → Scripting
+Define Symbols). Errors and warnings remain always on.
 
 ## Optional MIDI Plugin integration
 

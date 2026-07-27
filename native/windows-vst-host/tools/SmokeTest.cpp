@@ -3,6 +3,9 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <thread>
 
 #include "VstHostNative.h"
 
@@ -155,6 +158,53 @@ int main()
         return 1;
     }
 
+    // AGain SideChain: second input bus must be bound (regression for Unity crash).
+    const ScannedEntry* againSide = nullptr;
+    for (const auto& item : entries)
+    {
+        if (toNarrow(item.name).find("SideChain") != std::string::npos)
+        {
+            againSide = &item;
+            break;
+        }
+    }
+    if (againSide)
+    {
+        VstPluginId sideId = -1;
+        if (VstHost_Load(againSide->filePath.c_str(), againSide->uid.c_str(), &sideId) != kVstHostOk
+            || sideId < 1)
+        {
+            printf("FAIL: Load AGain SideChain\n");
+            VstHost_Unload(id);
+            VstHost_Terminate();
+            return 1;
+        }
+        if (VstHost_Process(sideId, inL.data(), inR.data(), outL.data(), outR.data(), kFrames)
+            != kVstHostOk)
+        {
+            printf("FAIL: Process AGain SideChain (effect)\n");
+            VstHost_Unload(sideId);
+            VstHost_Unload(id);
+            VstHost_Terminate();
+            return 1;
+        }
+        if (VstHost_Process(sideId, nullptr, nullptr, outL.data(), outR.data(), kFrames)
+            != kVstHostOk)
+        {
+            printf("FAIL: Process AGain SideChain (null input)\n");
+            VstHost_Unload(sideId);
+            VstHost_Unload(id);
+            VstHost_Terminate();
+            return 1;
+        }
+        VstHost_Unload(sideId);
+        printf("Process AGain SideChain ok\n");
+    }
+    else
+    {
+        printf("WARN: AGain SideChain not found; skipped\n");
+    }
+
     // Phase 6: parameters / state on AGain
     int32_t paramCount = 0;
     if (VstHost_GetParameterCount(id, &paramCount) != kVstHostOk || paramCount <= 0)
@@ -293,6 +343,61 @@ int main()
     else
     {
         printf("WARN: no Instrument found for Process smoke\n");
+    }
+
+    // Stress: rapid Load/Unload while a worker keeps calling Process (race regression).
+    // Capture paths before any further scans mutate `entries`.
+    const std::u16string stressPath = again->filePath;
+    const std::u16string stressUid = again->uid;
+    {
+        printf("Load/Unload+Process stress...\n");
+        std::atomic<VstPluginId> liveId{0};
+        std::atomic<bool> stop{false};
+        std::atomic<int> processCalls{0};
+        std::thread worker([&]() {
+            std::vector<float> wl(kFrames), wr(kFrames);
+            while (!stop.load(std::memory_order_acquire))
+            {
+                const VstPluginId cur = liveId.load(std::memory_order_acquire);
+                if (cur > 0)
+                {
+                    VstHost_Process(cur, nullptr, nullptr, wl.data(), wr.data(), kFrames);
+                    processCalls.fetch_add(1, std::memory_order_relaxed);
+                }
+                else
+                {
+                    std::this_thread::yield();
+                }
+            }
+        });
+
+        for (int i = 0; i < 40; ++i)
+        {
+            VstPluginId stressId = 0;
+            if (VstHost_Load(stressPath.c_str(), stressUid.c_str(), &stressId) != kVstHostOk)
+            {
+                printf("FAIL: stress Load iteration %d\n", i);
+                stop.store(true);
+                worker.join();
+                VstHost_Terminate();
+                return 1;
+            }
+            liveId.store(stressId, std::memory_order_release);
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            liveId.store(0, std::memory_order_release);
+            if (VstHost_Unload(stressId) != kVstHostOk)
+            {
+                printf("FAIL: stress Unload iteration %d\n", i);
+                stop.store(true);
+                worker.join();
+                VstHost_Terminate();
+                return 1;
+            }
+        }
+
+        stop.store(true, std::memory_order_release);
+        worker.join();
+        printf("Stress ok (processCalls=%d)\n", processCalls.load());
     }
 
     // Default-path scan (empty folder argument)

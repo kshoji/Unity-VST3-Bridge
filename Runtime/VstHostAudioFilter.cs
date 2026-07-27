@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using UnityEngine;
 
 namespace jp.kshoji.unity.vst3nativehost
@@ -30,11 +31,22 @@ namespace jp.kshoji.unity.vst3nativehost
         private float[] planarR = Array.Empty<float>();
         private AudioSource audioSource;
         private bool warnedNotReady;
+        // Arm on main thread one frame after Attach so Load/Refresh cannot race first Process.
+        private int pendingPluginId = -1;
+        private int armedPluginId = -1;
 
         public int PluginId
         {
-            get => pluginId;
-            set => pluginId = value;
+            get => Volatile.Read(ref armedPluginId);
+            set
+            {
+                Volatile.Write(ref pendingPluginId, value);
+                Volatile.Write(ref pluginId, value);
+                if (value < 1)
+                {
+                    Volatile.Write(ref armedPluginId, -1);
+                }
+            }
         }
 
         public ProcessMode Mode
@@ -88,9 +100,47 @@ namespace jp.kshoji.unity.vst3nativehost
                 audioSource.Play();
         }
 
+        /// <summary>Stop routing audio to a plugin before native unload.</summary>
+        public void DetachPlugin()
+        {
+            Volatile.Write(ref pendingPluginId, -1);
+            Volatile.Write(ref armedPluginId, -1);
+            Volatile.Write(ref pluginId, -1);
+            if (audioSource != null && audioSource.isPlaying)
+                audioSource.Pause();
+        }
+
+        /// <summary>
+        /// Queue routing to <paramref name="id"/>. Process starts on the next LateUpdate
+        /// so main-thread Load/parameter refresh can finish first.
+        /// </summary>
+        public void AttachPlugin(int id)
+        {
+            Volatile.Write(ref pendingPluginId, id);
+            Volatile.Write(ref pluginId, id);
+            // Keep armed cleared until LateUpdate — avoid Process during same-frame setup.
+            Volatile.Write(ref armedPluginId, -1);
+            if (autoPlaySilentSource)
+                EnsureSilentSourcePlaying();
+        }
+
+        private void LateUpdate()
+        {
+            if (warnedNotReady)
+            {
+                warnedNotReady = false;
+                Debug.LogWarning("[VstHostAudioFilter] Host not initialized; audio skipped.");
+            }
+
+            var pending = Volatile.Read(ref pendingPluginId);
+            if (Volatile.Read(ref armedPluginId) != pending)
+                Volatile.Write(ref armedPluginId, pending);
+        }
+
         private void OnAudioFilterRead(float[] data, int channels)
         {
-            if (pluginId < 1 || data == null || data.Length == 0 || channels <= 0)
+            var id = Volatile.Read(ref armedPluginId);
+            if (id < 1 || data == null || data.Length == 0 || channels <= 0)
                 return;
 
             var host = VstHostManager.Instance;
@@ -116,26 +166,18 @@ namespace jp.kshoji.unity.vst3nativehost
             if (mode == ProcessMode.Effect)
             {
                 Deinterleave(data, channels, frames, planarL, planarR);
-                if (!host.Process(pluginId, planarL, planarR, planarL, planarR, frames))
+                if (!host.Process(id, planarL, planarR, planarL, planarR, frames))
                     return;
             }
             else
             {
                 Array.Clear(planarL, 0, frames);
                 Array.Clear(planarR, 0, frames);
-                if (!host.Process(pluginId, null, null, planarL, planarR, frames))
+                if (!host.Process(id, null, null, planarL, planarR, frames))
                     return;
             }
 
             InterleaveReplace(planarL, planarR, data, channels, frames, outputGain);
-        }
-
-        private void LateUpdate()
-        {
-            if (!warnedNotReady)
-                return;
-            warnedNotReady = false;
-            Debug.LogWarning("[VstHostAudioFilter] Host not initialized; audio skipped.");
         }
 
         private void EnsurePlanarCapacity(int frames)

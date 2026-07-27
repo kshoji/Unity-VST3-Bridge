@@ -1,0 +1,9 @@
+# Published / registry package contents (native SDK sources stay in the Git repo only).
+native/
+native/**
+Tests/
+Tests/**
+*.pdb
+.vs/
+.idea/
+vst3-native-host-plan.md

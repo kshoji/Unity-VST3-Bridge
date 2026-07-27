@@ -92,6 +92,13 @@ namespace jp.kshoji.unity.vst3nativehost
                 blockSize = 8192;
 
             var result = VstHostNative.VstHost_Initialize(sampleRate, blockSize);
+            if (result == VstHostResult.ErrorAlreadyInitialized)
+            {
+                // Native DLL can outlive C# after domain reload or missed Play Mode cleanup.
+                VstHostNative.VstHost_Terminate();
+                result = VstHostNative.VstHost_Initialize(sampleRate, blockSize);
+            }
+
             if (result != VstHostResult.Ok)
             {
                 Debug.LogError($"[VstHost] Initialize failed: {result}");
@@ -101,7 +108,8 @@ namespace jp.kshoji.unity.vst3nativehost
             SampleRate = sampleRate;
             BlockSize = blockSize;
             initialized = true;
-            Debug.Log($"[VstHost] Initialized (sampleRate={sampleRate}, blockSize={blockSize})");
+            loadedPlugins.Clear();
+            VstHostLog.Trace($"[VstHost] Initialized (sampleRate={sampleRate}, blockSize={blockSize})");
             return true;
         }
 
@@ -120,7 +128,16 @@ namespace jp.kshoji.unity.vst3nativehost
 
         public void Terminate()
         {
-            if (!initialized) return;
+            if (!initialized)
+            {
+                // Editor: C# may have been domain-reloaded while native stayed initialized.
+                if (VstHostNative.VstHost_Terminate() == VstHostResult.Ok)
+                {
+                    loadedPlugins.Clear();
+                    VstHostLog.Trace("[VstHost] Terminated (native was still active).");
+                }
+                return;
+            }
 
             var result = VstHostNative.VstHost_Terminate();
             if (result != VstHostResult.Ok)
@@ -128,7 +145,7 @@ namespace jp.kshoji.unity.vst3nativehost
 
             loadedPlugins.Clear();
             initialized = false;
-            Debug.Log("[VstHost] Terminated.");
+            VstHostLog.Trace("[VstHost] Terminated.");
         }
 
         /// <summary>
@@ -163,7 +180,7 @@ namespace jp.kshoji.unity.vst3nativehost
 
             var copy = new List<ScannedPlugin>(scanResults);
             scanResults.Clear();
-            Debug.Log($"[VstHost] Scan found {copy.Count} plugin class(es).");
+            VstHostLog.Trace($"[VstHost] Scan found {copy.Count} plugin class(es).");
             return copy;
         }
 
@@ -209,7 +226,7 @@ namespace jp.kshoji.unity.vst3nativehost
             }
 
             loadedPlugins[id] = new LoadedPluginInfo(filePath, uid ?? string.Empty);
-            Debug.Log($"[VstHost] CreateInstance id={id} path='{filePath}' uid='{uid}'");
+            VstHostLog.Trace($"[VstHost] CreateInstance id={id} path='{filePath}' uid='{uid}'");
             return id;
         }
 
@@ -217,10 +234,7 @@ namespace jp.kshoji.unity.vst3nativehost
         public bool DestroyInstance(int id)
         {
             if (!initialized)
-            {
-                Debug.LogError("[VstHost] Not initialized.");
-                return false;
-            }
+                return true;
 
             var result = VstHostNative.VstHost_Unload(id);
             if (result != VstHostResult.Ok)
@@ -230,7 +244,7 @@ namespace jp.kshoji.unity.vst3nativehost
             }
 
             loadedPlugins.Remove(id);
-            Debug.Log($"[VstHost] DestroyInstance id={id}");
+            VstHostLog.Trace($"[VstHost] DestroyInstance id={id}");
             return true;
         }
 
