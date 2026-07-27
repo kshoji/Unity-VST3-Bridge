@@ -1,0 +1,4 @@
+# Keep directory in git; allow committed DLLs.
+*
+!.gitignore
+!*.dll

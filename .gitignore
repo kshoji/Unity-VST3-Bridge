@@ -18,6 +18,8 @@ Thumbs.db
 
 # Native build output (committed DLLs go in Plugins/)
 native/**/build/
+native/**/build-x64/
+native/**/build-arm64/
 native/**/out/
 *.pdb
 

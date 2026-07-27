@@ -80,10 +80,15 @@ set_target_properties(VstHostNative PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
 
-# Install to Plugins directory
+# Install to Plugins directory (arch-specific)
+if(CMAKE_GENERATOR_PLATFORM MATCHES "[Aa][Rr][Mm]64")
+    set(VSTHOST_PLUGIN_ARCH_DIR "ARM64")
+else()
+    set(VSTHOST_PLUGIN_ARCH_DIR "x86_64")
+endif()
 install(TARGETS VstHostNative
-    RUNTIME DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/../../Plugins/Windows/x86_64"
-    LIBRARY DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/../../Plugins/Windows/x86_64"
+    RUNTIME DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/../../Plugins/Windows/${VSTHOST_PLUGIN_ARCH_DIR}"
+    LIBRARY DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/../../Plugins/Windows/${VSTHOST_PLUGIN_ARCH_DIR}"
 )
 
 # --- Smoke test (dev only) ---

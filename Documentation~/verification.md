@@ -4,7 +4,7 @@
 
 - Windows 10/11 x64
 - Unity 2022.3+ or Unity 6 (MIDI sample project uses Unity 6)
-- `VstHostNative.dll` present (`.\native\windows-vst-host\Build.ps1 -Install`)
+- `VstHostNative.dll` present for x64 + ARM64 (`.\native\windows-vst-host\Build.ps1 -Install`)
 - Local `.vst3` plugins (do **not** redistribute third-party plugins)
 
 ## Verification A — VST only (manual notes)
@@ -54,13 +54,13 @@ Uses Unity 2022.3.x by default, embeds the package **without** `native/`, builds
 
 Manual:
 
-1. File → Build Settings → Windows → Architecture **x86_64**.
+1. File → Build Settings → Windows → Architecture **x86_64** (or **ARM64** with `Plugins/Windows/ARM64` deployed).
 2. Player Settings → Configuration → Scripting Backend **IL2CPP**.
-3. Menu **Window → VST3 Host → Verify Plugin Platforms** (Editor + Win64 only).
+3. Menu **Window → VST3 Host → Verify Plugin Platforms** (x64: Editor + Win64; ARM64: Windows ARM64 only).
 4. `Runtime/link.xml` preserves the Runtime assembly for P/Invoke.
 5. Menu **Window → VST3 Host → Build IL2CPP Win64 (Verify)**, or Build and Run and play Note On.
 
-When linking the repo via `file:` / Git, `native/**/build` DLLs may appear — use **Window → VST3 Host → Sanitize Extra Native Plugins**.
+When linking the repo via `file:` / Git, `native/**/build*` DLLs may appear — use **Window → VST3 Host → Sanitize Extra Native Plugins**.
 
 ## MIDI-only build must not contain VST
 

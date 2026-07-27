@@ -16,7 +16,8 @@ No `?path=` suffix is needed — `package.json` is at the repository root.
 
 - `Runtime/` — runtime C# code
 - `Editor/` — editor-only code
-- `Plugins/Windows/x86_64/` — native bridge DLL output
+- `Plugins/Windows/x86_64/` — native bridge DLL (Editor + Standalone Win64)
+- `Plugins/Windows/ARM64/` — native bridge DLL (Standalone Windows ARM64)
 - `Samples~/` — importable samples
 - `Documentation~/` — package documentation
 - `Tests/` — optional package tests

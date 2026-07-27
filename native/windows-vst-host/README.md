@@ -5,18 +5,26 @@ consumed by Unity via P/Invoke (`DllImport("VstHostNative")`).
 
 ## Prerequisites
 
-- **Windows 10/11** (x64)
-- **Visual Studio 2022** (or Build Tools) with C++ desktop workload
+- **Windows 10/11** (x64 host; ARM64 cross-compile supported)
+- **Visual Studio 2022+** (or Build Tools) with C++ desktop workload **and ARM64 tools**
 - **CMake 3.25+**
 
 ## Building
 
 ```powershell
 # From this directory
-.\Build.ps1                     # Release build
-.\Build.ps1 -Install            # Build and copy DLL to Plugins/Windows/x86_64/
+.\Build.ps1                     # Release x64 + ARM64
+.\Build.ps1 -Install            # Build both and copy to Plugins/Windows/{x86_64,ARM64}/
+.\Build.ps1 -Platform x64 -Install
+.\Build.ps1 -Platform ARM64 -Install
 .\Build.ps1 -Configuration Debug
 ```
+
+| Arch | Output | Unity Plugin settings |
+|------|--------|------------------------|
+| x64 | `Plugins/Windows/x86_64/VstHostNative.dll` | Editor (Windows x86_64) + Standalone Win64 |
+| ARM64 | `Plugins/Windows/ARM64/VstHostNative.dll` | Standalone Windows ARM64 only |
+
 
 ## Exported Functions
 

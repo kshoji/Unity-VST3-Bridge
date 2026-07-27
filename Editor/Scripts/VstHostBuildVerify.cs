@@ -14,7 +14,8 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
     /// </summary>
     public static class VstHostBuildVerify
     {
-        private const string DllRelative = "Plugins/Windows/x86_64/VstHostNative.dll";
+        private const string DllRelativeX64 = "Plugins/Windows/x86_64/VstHostNative.dll";
+        private const string DllRelativeArm64 = "Plugins/Windows/ARM64/VstHostNative.dll";
 
         [MenuItem("Window/VST3 Host/Verify Plugin Platforms")]
         public static void VerifyPluginPlatformsMenu()
@@ -98,37 +99,63 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
 
         public static bool VerifyPluginPlatforms(out string message)
         {
-            var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssembly(
-                typeof(VstHostManager).Assembly);
-            string dllAssetPath = null;
-
-            if (packageInfo != null)
+            if (!TryResolveDllAssetPath(DllRelativeX64, out var x64Path))
             {
-                var candidate = Path.Combine(packageInfo.assetPath, DllRelative).Replace('\\', '/');
-                if (File.Exists(Path.GetFullPath(candidate)))
-                    dllAssetPath = candidate;
-            }
-
-            if (dllAssetPath == null)
-            {
-                var guids = AssetDatabase.FindAssets("VstHostNative t:DefaultAsset");
-                foreach (var guid in guids)
-                {
-                    var path = AssetDatabase.GUIDToAssetPath(guid);
-                    if (path.EndsWith("VstHostNative.dll", StringComparison.OrdinalIgnoreCase))
-                    {
-                        dllAssetPath = path;
-                        break;
-                    }
-                }
-            }
-
-            if (dllAssetPath == null)
-            {
-                message = $"Could not locate {DllRelative} in the package.";
+                message = $"Could not locate {DllRelativeX64} in the package.";
                 return false;
             }
 
+            if (!VerifyX64Importer(x64Path, out message))
+                return false;
+
+            if (!TryResolveDllAssetPath(DllRelativeArm64, out var arm64Path))
+            {
+                message = $"Could not locate {DllRelativeArm64} in the package.";
+                return false;
+            }
+
+            if (!VerifyArm64Importer(arm64Path, out message))
+                return false;
+
+            message = $"{x64Path}: Editor + Win64 OK; {arm64Path}: Windows ARM64 OK.";
+            return true;
+        }
+
+        private static bool TryResolveDllAssetPath(string dllRelative, out string dllAssetPath)
+        {
+            dllAssetPath = null;
+            var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssembly(
+                typeof(VstHostManager).Assembly);
+
+            if (packageInfo != null)
+            {
+                var candidate = Path.Combine(packageInfo.assetPath, dllRelative).Replace('\\', '/');
+                if (File.Exists(Path.GetFullPath(candidate)))
+                {
+                    dllAssetPath = candidate;
+                    return true;
+                }
+            }
+
+            var needle = dllRelative.Replace('\\', '/');
+            var guids = AssetDatabase.FindAssets("VstHostNative t:DefaultAsset");
+            foreach (var guid in guids)
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                if (path.Replace('\\', '/').EndsWith(needle, StringComparison.OrdinalIgnoreCase)
+                    || (path.EndsWith("VstHostNative.dll", StringComparison.OrdinalIgnoreCase)
+                        && path.Replace('\\', '/').IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0))
+                {
+                    dllAssetPath = path;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool VerifyX64Importer(string dllAssetPath, out string message)
+        {
             var importer = AssetImporter.GetAtPath(dllAssetPath) as PluginImporter;
             if (importer == null)
             {
@@ -160,6 +187,38 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
             }
 
             message = $"{dllAssetPath}: platforms OK (Editor + Win64 only).";
+            return true;
+        }
+
+        private static bool VerifyArm64Importer(string dllAssetPath, out string message)
+        {
+            var importer = AssetImporter.GetAtPath(dllAssetPath) as PluginImporter;
+            if (importer == null)
+            {
+                message = $"PluginImporter missing for {dllAssetPath}";
+                return false;
+            }
+
+            var anyOk = importer.GetCompatibleWithAnyPlatform();
+            var editorOk = importer.GetCompatibleWithEditor();
+            var win64Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows64);
+            var win32Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows);
+
+            if (anyOk)
+            {
+                message = $"{dllAssetPath}: must not be Compatible With Any Platform (Windows ARM64 only).";
+                return false;
+            }
+
+            if (editorOk || win64Ok || win32Ok)
+            {
+                message = $"{dllAssetPath}: disable Editor/Win64/Win32 (Standalone Windows ARM64 only; editorOk={editorOk}, win64Ok={win64Ok}).";
+                return false;
+            }
+
+            // Platform enablement for ARM64 is primarily driven by the .meta
+            // (Standalone: Windows ARM64). Presence of the asset is enough here.
+            message = $"{dllAssetPath}: platforms OK (Windows ARM64 only).";
             return true;
         }
 
