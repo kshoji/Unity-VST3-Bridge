@@ -9,9 +9,11 @@ var host = VstHostManager.Instance;
 host.Initialize(AudioSettings.outputSampleRate, 512);
 int id = host.CreateInstance(@"C:\Program Files\Common Files\VST3\again.vst3");
 host.NoteOn(id, channel: 0, note: 60, velocity: 100);
-// Phase 5: audio returns via OnAudioFilterRead
+// Audio: VstHostAudioFilter (OnAudioFilterRead → Process)
 host.NoteOff(id, channel: 0, note: 60);
 ```
+
+See also `audio-path.md`.
 
 ## With MIDI Plugin
 

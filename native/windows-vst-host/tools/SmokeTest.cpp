@@ -1,6 +1,8 @@
 #include <cstdio>
+#include <cmath>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 #include "VstHostNative.h"
 
@@ -125,7 +127,104 @@ int main()
     }
     printf("SendMidi1 NoteOn/NoteOff ok\n");
 
+    // Phase 5: Process AGain (effect) with a sine input
+    constexpr int kFrames = 512;
+    std::vector<float> inL(kFrames), inR(kFrames), outL(kFrames), outR(kFrames);
+    for (int i = 0; i < kFrames; ++i)
+    {
+        const float s = 0.25f * std::sin(2.f * 3.14159265f * 440.f * i / 48000.f);
+        inL[i] = s;
+        inR[i] = s;
+    }
+    if (VstHost_Process(id, inL.data(), inR.data(), outL.data(), outR.data(), kFrames) != kVstHostOk)
+    {
+        printf("FAIL: Process (AGain)\n");
+        VstHost_Unload(id);
+        VstHost_Terminate();
+        return 1;
+    }
+    double energy = 0.0;
+    for (int i = 0; i < kFrames; ++i)
+        energy += static_cast<double>(outL[i]) * outL[i] + static_cast<double>(outR[i]) * outR[i];
+    printf("Process AGain energy=%.6f\n", energy);
+    if (energy < 1e-8)
+    {
+        printf("FAIL: AGain process produced silence\n");
+        VstHost_Unload(id);
+        VstHost_Terminate();
+        return 1;
+    }
     VstHost_Unload(id);
+
+    // Phase 5: Instrument path — NoteOn + silent input Process
+    const ScannedEntry* instrument = nullptr;
+    for (const auto& item : entries)
+    {
+        auto cat = toNarrow(item.category);
+        auto name = toNarrow(item.name);
+        if (cat.find("Instrument") != std::string::npos
+            && name.find("mda DX10") != std::string::npos)
+        {
+            instrument = &item;
+            break;
+        }
+    }
+    if (!instrument)
+    {
+        for (const auto& item : entries)
+        {
+            if (toNarrow(item.category).find("Instrument") != std::string::npos)
+            {
+                instrument = &item;
+                break;
+            }
+        }
+    }
+
+    if (instrument)
+    {
+        printf("Load instrument: %s\n", toNarrow(instrument->name).c_str());
+        if (VstHost_Load(instrument->filePath.c_str(), instrument->uid.c_str(), &id) != kVstHostOk)
+        {
+            printf("FAIL: Load instrument\n");
+            VstHost_Terminate();
+            return 1;
+        }
+        VstHost_SendMidi1(id, 0x90, 60, 100);
+        std::fill(outL.begin(), outL.end(), 0.f);
+        std::fill(outR.begin(), outR.end(), 0.f);
+        // Warm-up a few blocks (some synths attack slowly)
+        bool processOk = true;
+        double instEnergy = 0.0;
+        for (int block = 0; block < 8; ++block)
+        {
+            if (VstHost_Process(id, nullptr, nullptr, outL.data(), outR.data(), kFrames) != kVstHostOk)
+            {
+                processOk = false;
+                break;
+            }
+            for (int i = 0; i < kFrames; ++i)
+                instEnergy += static_cast<double>(outL[i]) * outL[i]
+                              + static_cast<double>(outR[i]) * outR[i];
+        }
+        VstHost_SendMidi1(id, 0x80, 60, 0);
+        printf("Instrument process ok=%d energy=%.6f\n", processOk ? 1 : 0, instEnergy);
+        if (!processOk)
+        {
+            printf("FAIL: Instrument Process\n");
+            VstHost_Unload(id);
+            VstHost_Terminate();
+            return 1;
+        }
+        // Soft check: warn if silent (some instruments need preset/GUI), don't fail hard
+        if (instEnergy < 1e-10)
+            printf("WARN: Instrument produced near-silence (may need preset)\n");
+        VstHost_Unload(id);
+    }
+    else
+    {
+        printf("WARN: no Instrument found for Process smoke\n");
+    }
 
     // Default-path scan (empty folder argument)
     entries.clear();
@@ -143,6 +242,6 @@ int main()
         return 1;
     }
 
-    printf("OK: Phase 3/4 smoke test passed\n");
+    printf("OK: Phase 3/4/5 smoke test passed\n");
     return 0;
 }

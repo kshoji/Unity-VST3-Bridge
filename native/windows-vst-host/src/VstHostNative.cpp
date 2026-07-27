@@ -15,6 +15,8 @@
 #include "pluginterfaces/base/ipluginbase.h"
 #include "public.sdk/source/vst/hosting/eventlist.h"
 #include "public.sdk/source/vst/hosting/parameterchanges.h"
+#include "public.sdk/source/vst/hosting/processdata.h"
+#include "pluginterfaces/vst/ivstprocesscontext.h"
 
 #include <atomic>
 #include <cstring>
@@ -107,7 +109,16 @@ struct PluginInstance
     Midi1Queue midiQueue;
     Steinberg::Vst::EventList inputEvents{128};
     Steinberg::Vst::ParameterChanges inputParams{64};
+    Steinberg::Vst::ParameterChanges outputParams{64};
+    Steinberg::Vst::HostProcessData processData;
+    Steinberg::Vst::ProcessContext processContext{};
+    std::vector<float> silentScratch;
+    bool processPrepared = false;
+    int32_t audioInputChannels = 0;
+    int32_t audioOutputChannels = 0;
 };
+
+bool prepareAudioProcess(PluginInstance& inst); // defined after g_state
 
 void tryBindMidiMapping(PluginInstance& inst)
 {
@@ -149,8 +160,7 @@ void pushMappedParam(PluginInstance& inst,
 // Convert queued MIDI 1.0 short messages into VST3 EventList / ParameterChanges.
 // Note / poly pressure → EventList. CC / channel pressure / pitch bend →
 // IMidiMapping parameter changes when available.
-// Called from the audio Process path (Phase 5); kept ready in Phase 4.
-[[maybe_unused]] void drainMidiQueue(PluginInstance& inst)
+void drainMidiQueue(PluginInstance& inst)
 {
     inst.inputEvents.clear();
     inst.inputParams.clearQueue();
@@ -237,6 +247,47 @@ std::mutex g_mutex;
 HostState g_state;
 std::atomic<VstPluginId> g_nextId{1};
 std::unordered_map<VstPluginId, std::unique_ptr<PluginInstance>> g_instances;
+
+bool prepareAudioProcess(PluginInstance& inst)
+{
+    using namespace Steinberg::Vst;
+
+    inst.processData.unprepare();
+    inst.processPrepared = false;
+    inst.silentScratch.assign(static_cast<size_t>(g_state.blockSize), 0.f);
+
+    // bufferSamples = 0 → allocate bus/channel pointer slots; we bind external buffers each Process.
+    if (!inst.processData.prepare(*inst.component, 0, kSample32))
+        return false;
+
+    inst.processContext = {};
+    inst.processContext.sampleRate = static_cast<double>(g_state.sampleRate);
+    inst.processContext.tempo = 120.0;
+    inst.processContext.state = ProcessContext::kPlaying | ProcessContext::kTempoValid
+                                 | ProcessContext::kContTimeValid;
+    inst.processContext.projectTimeSamples = 0;
+    inst.processContext.continousTimeSamples = 0;
+
+    inst.processData.processContext = &inst.processContext;
+    inst.processData.inputEvents = &inst.inputEvents;
+    inst.processData.inputParameterChanges = &inst.inputParams;
+    inst.processData.outputParameterChanges = &inst.outputParams;
+    inst.processData.processMode = kRealtime;
+    inst.processData.symbolicSampleSize = kSample32;
+
+    BusInfo info{};
+    inst.audioInputChannels = 0;
+    inst.audioOutputChannels = 0;
+    if (inst.component->getBusCount(kAudio, kInput) > 0
+        && inst.component->getBusInfo(kAudio, kInput, 0, info) == Steinberg::kResultOk)
+        inst.audioInputChannels = info.channelCount;
+    if (inst.component->getBusCount(kAudio, kOutput) > 0
+        && inst.component->getBusInfo(kAudio, kOutput, 0, info) == Steinberg::kResultOk)
+        inst.audioOutputChannels = info.channelCount;
+
+    inst.processPrepared = true;
+    return true;
+}
 
 std::string toUtf8(const char16_t* s)
 {
@@ -359,6 +410,13 @@ void destroyInstance(PluginInstance& inst)
     inst.midiQueue.clear();
     inst.inputEvents.clear();
     inst.inputParams.clearQueue();
+    inst.outputParams.clearQueue();
+    if (inst.processPrepared)
+    {
+        inst.processData.unprepare();
+        inst.processPrepared = false;
+    }
+    inst.silentScratch.clear();
     inst.midiMapping.reset();
     inst.processor.reset();
     inst.controller.reset();
@@ -665,9 +723,21 @@ VSTHOST_API VstHostResult VstHost_Load(const char16_t* filePath,
     }
     inst->active = true;
 
+    // Some plugins return false until buses/process data exist; retry after prepare.
     if (inst->processor->setProcessing(true) == Steinberg::kResultOk)
         inst->processing = true;
 
+    if (!prepareAudioProcess(*inst))
+    {
+        destroyInstance(*inst);
+        return kVstHostErrorLoadFailed;
+    }
+
+    if (!inst->processing
+        && inst->processor->setProcessing(true) == Steinberg::kResultOk)
+        inst->processing = true;
+
+    // setProcessing may still fail on some plugins until the first process(); keep soft.
     const VstPluginId id = g_nextId.fetch_add(1);
     *outId = id;
     g_instances[id] = std::move(inst);
@@ -731,20 +801,114 @@ VSTHOST_API VstHostResult VstHost_Process(VstPluginId id,
     if (!outputL || !outputR || numFrames <= 0)
         return kVstHostErrorInvalidArgument;
 
-    std::memset(outputL, 0, sizeof(float) * static_cast<size_t>(numFrames));
-    std::memset(outputR, 0, sizeof(float) * static_cast<size_t>(numFrames));
-
+    PluginInstance* inst = nullptr;
     {
         std::lock_guard lock(g_mutex);
         if (!g_state.initialized)
             return kVstHostErrorNotInitialized;
-        if (g_instances.find(id) == g_instances.end())
+        auto it = g_instances.find(id);
+        if (it == g_instances.end())
             return kVstHostErrorInvalidId;
+        inst = it->second.get();
     }
 
-    // Phase 5: drainMidiQueue(*inst) then processor->process(...).
-    // Do not drain here — that would discard notes before audio is wired.
-    (void)inputL;
-    (void)inputR;
+    if (!inst->processPrepared || !inst->processor)
+    {
+        std::memset(outputL, 0, sizeof(float) * static_cast<size_t>(numFrames));
+        std::memset(outputR, 0, sizeof(float) * static_cast<size_t>(numFrames));
+        return kVstHostErrorProcessFailed;
+    }
+
+    if (!inst->processing)
+    {
+        if (inst->processor->setProcessing(true) == Steinberg::kResultOk)
+            inst->processing = true;
+    }
+
+    if (numFrames > g_state.blockSize)
+    {
+        std::memset(outputL, 0, sizeof(float) * static_cast<size_t>(numFrames));
+        std::memset(outputR, 0, sizeof(float) * static_cast<size_t>(numFrames));
+        return kVstHostErrorInvalidArgument;
+    }
+
+    using namespace Steinberg::Vst;
+
+    drainMidiQueue(*inst);
+    inst->outputParams.clearQueue();
+
+    inst->processContext.sampleRate = static_cast<double>(g_state.sampleRate);
+    inst->processContext.projectTimeSamples = inst->processContext.continousTimeSamples;
+    inst->processData.numSamples = numFrames;
+
+    float* silence = inst->silentScratch.data();
+    if (static_cast<int32_t>(inst->silentScratch.size()) < numFrames)
+    {
+        inst->silentScratch.assign(static_cast<size_t>(numFrames), 0.f);
+        silence = inst->silentScratch.data();
+    }
+    else
+    {
+        std::memset(silence, 0, sizeof(float) * static_cast<size_t>(numFrames));
+    }
+
+    const float* inL = inputL ? inputL : silence;
+    const float* inR = inputR ? inputR : (inputL ? inputL : silence);
+
+    // Bind first audio input bus (effect) or leave silent / absent (instrument).
+    if (inst->processData.numInputs > 0)
+    {
+        auto& bus = inst->processData.inputs[0];
+        if (bus.numChannels >= 1 && bus.channelBuffers32)
+            bus.channelBuffers32[0] = const_cast<float*>(inL);
+        if (bus.numChannels >= 2 && bus.channelBuffers32)
+            bus.channelBuffers32[1] = const_cast<float*>(inR);
+        for (int32_t c = 2; c < bus.numChannels; ++c)
+            bus.channelBuffers32[c] = silence;
+        bus.silenceFlags = inputL ? 0 : HostProcessData::kAllChannelsSilent;
+    }
+
+    // Bind first audio output bus (stereo preferred).
+    if (inst->processData.numOutputs > 0)
+    {
+        auto& bus = inst->processData.outputs[0];
+        if (bus.numChannels >= 1 && bus.channelBuffers32)
+            bus.channelBuffers32[0] = outputL;
+        if (bus.numChannels >= 2 && bus.channelBuffers32)
+            bus.channelBuffers32[1] = outputR;
+        for (int32_t c = 2; c < bus.numChannels; ++c)
+            bus.channelBuffers32[c] = silence;
+        bus.silenceFlags = 0;
+    }
+    else
+    {
+        std::memset(outputL, 0, sizeof(float) * static_cast<size_t>(numFrames));
+        std::memset(outputR, 0, sizeof(float) * static_cast<size_t>(numFrames));
+        return kVstHostErrorProcessFailed;
+    }
+
+    const auto result = inst->processor->process(inst->processData);
+    inst->processContext.continousTimeSamples += numFrames;
+
+    // Mono out → duplicate to R.
+    if (inst->audioOutputChannels == 1)
+        std::memcpy(outputR, outputL, sizeof(float) * static_cast<size_t>(numFrames));
+
+    // Unbind pointers so destroy cannot leave dangling refs.
+    if (inst->processData.numInputs > 0)
+    {
+        auto& bus = inst->processData.inputs[0];
+        for (int32_t c = 0; c < bus.numChannels; ++c)
+            bus.channelBuffers32[c] = nullptr;
+    }
+    if (inst->processData.numOutputs > 0)
+    {
+        auto& bus = inst->processData.outputs[0];
+        for (int32_t c = 0; c < bus.numChannels; ++c)
+            bus.channelBuffers32[c] = nullptr;
+    }
+
+    if (result != Steinberg::kResultOk)
+        return kVstHostErrorProcessFailed;
     return kVstHostOk;
 }

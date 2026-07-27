@@ -28,7 +28,7 @@ consumed by Unity via P/Invoke (`DllImport("VstHostNative")`).
 | `VstHost_Load` | Load a .vst3 and create an instance (optional class UID) |
 | `VstHost_Unload` | Destroy a plugin instance (fixed teardown order) |
 | `VstHost_SendMidi1` | Enqueue MIDI 1.0 short message (lock-free SPSC queue) |
-| `VstHost_Process` | Audio process stub (Phase 5 drains queue → EventList) |
+| `VstHost_Process` | Drain MIDI → VST `process` → planar stereo float buffers |
 
 ## Smoke test
 

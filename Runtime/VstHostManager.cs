@@ -85,6 +85,12 @@ namespace jp.kshoji.unity.vst3nativehost
                 return true;
             }
 
+            // Unity DSP buffers are often 256–1024; keep headroom for OnAudioFilterRead.
+            if (blockSize < 256)
+                blockSize = 256;
+            if (blockSize > 8192)
+                blockSize = 8192;
+
             var result = VstHostNative.VstHost_Initialize(sampleRate, blockSize);
             if (result != VstHostResult.Ok)
             {
@@ -97,6 +103,19 @@ namespace jp.kshoji.unity.vst3nativehost
             initialized = true;
             Debug.Log($"[VstHost] Initialized (sampleRate={sampleRate}, blockSize={blockSize})");
             return true;
+        }
+
+        /// <summary>
+        /// Initialize using <see cref="AudioSettings"/> sample rate and DSP buffer size.
+        /// Prefer this for Path B (<c>OnAudioFilterRead</c>).
+        /// </summary>
+        public bool InitializeFromAudioSettings(int blockSizeHeadroom = 2)
+        {
+            var config = AudioSettings.GetConfiguration();
+            var sampleRate = config.sampleRate > 0 ? config.sampleRate : AudioSettings.outputSampleRate;
+            var dsp = config.dspBufferSize > 0 ? config.dspBufferSize : 1024;
+            var block = Mathf.Max(dsp * Mathf.Max(1, blockSizeHeadroom), 1024);
+            return Initialize(sampleRate, block);
         }
 
         public void Terminate()
@@ -268,6 +287,37 @@ namespace jp.kshoji.unity.vst3nativehost
         {
             Midi1Util.ChannelAftertouch(channel, pressure, out var s, out var d1, out var d2);
             return SendMidi1(pluginId, s, d1, d2);
+        }
+
+        /// <summary>
+        /// Run one audio block on the native bridge (audio-thread safe).
+        /// Pass null inputs for instruments (silence). Planar stereo buffers.
+        /// </summary>
+        public unsafe bool Process(int pluginId, float[] inputL, float[] inputR, float[] outputL, float[] outputR, int numFrames)
+        {
+            if (!initialized || outputL == null || outputR == null || numFrames <= 0)
+                return false;
+            if (outputL.Length < numFrames || outputR.Length < numFrames)
+                return false;
+            if (numFrames > BlockSize)
+                return false;
+
+            fixed (float* outL = outputL)
+            fixed (float* outR = outputR)
+            {
+                if (inputL != null && inputR != null && inputL.Length >= numFrames && inputR.Length >= numFrames)
+                {
+                    fixed (float* inL = inputL)
+                    fixed (float* inR = inputR)
+                    {
+                        return VstHostNative.VstHost_Process(pluginId, inL, inR, outL, outR, numFrames)
+                               == VstHostResult.Ok;
+                    }
+                }
+
+                return VstHostNative.VstHost_Process(pluginId, null, null, outL, outR, numFrames)
+                       == VstHostResult.Ok;
+            }
         }
 
         public void Dispose()
