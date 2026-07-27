@@ -1,0 +1,3 @@
+# Keep the native plugin output directory in git.
+*
+!.gitignore

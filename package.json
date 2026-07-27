@@ -1,0 +1,16 @@
+{
+    "name": "jp.kshoji.unity.vst3nativehost",
+    "displayName": "Unity Plugin Host for VST3",
+    "author": {
+        "name": "Kaoru Shoji",
+        "url": "https://github.com/kshoji"
+    },
+    "keywords": [
+        "VST3",
+        "Audio"
+    ],
+    "version": "1.0.0",
+    "unity": "2022.3",
+    "description": "A Unity package for hosting VST3 instruments and effects through a native bridge, with optional MIDI plugin integration.",
+    "dependencies": {}
+}
