@@ -24,8 +24,9 @@ No `?path=` suffix is needed — `package.json` is at the repository root.
 
 ## Status
 
-Phases 0–5 are implemented on branch `feature/vst3-native-host-20260727`:
-native scan/load, MIDI queue, real VST `process`, and Unity `OnAudioFilterRead` return path.
+Phases 0–6 are implemented on branch `feature/vst3-native-host-20260727`:
+native host, MIDI, audio return, parameters / state / simple IMGUI panel.
+Plugin-native GUI is not hosted.
 
 ## Audio (Path B)
 

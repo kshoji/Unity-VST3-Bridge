@@ -49,6 +49,7 @@ add_library(sdk_hosting STATIC
     "${public_sdk_SOURCE_DIR}/source/vst/vstinitiids.cpp"
     "${public_sdk_SOURCE_DIR}/source/vst/utility/stringconvert.cpp"
     "${public_sdk_SOURCE_DIR}/source/common/commonstringconvert.cpp"
+    "${public_sdk_SOURCE_DIR}/source/common/memorystream.cpp"
     "${public_sdk_SOURCE_DIR}/source/common/threadchecker_win32.cpp"
 )
 target_include_directories(sdk_hosting PUBLIC "${SDK_ROOT}" "${public_sdk_SOURCE_DIR}")

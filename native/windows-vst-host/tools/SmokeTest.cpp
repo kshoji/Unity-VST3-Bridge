@@ -154,6 +154,75 @@ int main()
         VstHost_Terminate();
         return 1;
     }
+
+    // Phase 6: parameters / state on AGain
+    int32_t paramCount = 0;
+    if (VstHost_GetParameterCount(id, &paramCount) != kVstHostOk || paramCount <= 0)
+    {
+        printf("FAIL: GetParameterCount\n");
+        VstHost_Unload(id);
+        VstHost_Terminate();
+        return 1;
+    }
+    printf("AGain parameter count=%d\n", paramCount);
+
+    VstParamInfo pinfo{};
+    if (VstHost_GetParameterInfo(id, 0, &pinfo) != kVstHostOk)
+    {
+        printf("FAIL: GetParameterInfo\n");
+        VstHost_Unload(id);
+        VstHost_Terminate();
+        return 1;
+    }
+    printf("Param[0] id=%u title=%s\n", pinfo.id, toNarrow(std::u16string(pinfo.title)).c_str());
+
+    double before = 0.0, after = 0.0;
+    VstHost_GetParameterNormalized(id, pinfo.id, &before);
+    if (VstHost_SetParameterNormalized(id, pinfo.id, 0.25) != kVstHostOk)
+    {
+        printf("FAIL: SetParameterNormalized\n");
+        VstHost_Unload(id);
+        VstHost_Terminate();
+        return 1;
+    }
+    VstHost_GetParameterNormalized(id, pinfo.id, &after);
+    printf("Param value %.3f -> %.3f\n", before, after);
+
+    // Process again after gain change — energy should differ from previous block baseline
+    if (VstHost_Process(id, inL.data(), inR.data(), outL.data(), outR.data(), kFrames) != kVstHostOk)
+    {
+        printf("FAIL: Process after param\n");
+        VstHost_Unload(id);
+        VstHost_Terminate();
+        return 1;
+    }
+    double energy2 = 0.0;
+    for (int i = 0; i < kFrames; ++i)
+        energy2 += static_cast<double>(outL[i]) * outL[i] + static_cast<double>(outR[i]) * outR[i];
+    printf("Process AGain after param energy=%.6f\n", energy2);
+
+    int32_t stateSize = 0;
+    VstHost_GetState(id, nullptr, 0, &stateSize);
+    std::vector<uint8_t> state(static_cast<size_t>(std::max(stateSize, 0)));
+    int32_t written = 0;
+    if (stateSize > 0
+        && VstHost_GetState(id, state.data(), static_cast<int32_t>(state.size()), &written) != kVstHostOk)
+    {
+        printf("FAIL: GetState\n");
+        VstHost_Unload(id);
+        VstHost_Terminate();
+        return 1;
+    }
+    printf("GetState bytes=%d\n", written);
+    if (written > 0 && VstHost_SetState(id, state.data(), written) != kVstHostOk)
+    {
+        printf("FAIL: SetState\n");
+        VstHost_Unload(id);
+        VstHost_Terminate();
+        return 1;
+    }
+    printf("SetState ok\n");
+
     VstHost_Unload(id);
 
     // Phase 5: Instrument path — NoteOn + silent input Process
@@ -242,6 +311,6 @@ int main()
         return 1;
     }
 
-    printf("OK: Phase 3/4/5 smoke test passed\n");
+    printf("OK: Phase 3/4/5/6 smoke test passed\n");
     return 0;
 }

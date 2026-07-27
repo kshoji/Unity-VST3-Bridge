@@ -29,6 +29,10 @@ consumed by Unity via P/Invoke (`DllImport("VstHostNative")`).
 | `VstHost_Unload` | Destroy a plugin instance (fixed teardown order) |
 | `VstHost_SendMidi1` | Enqueue MIDI 1.0 short message (lock-free SPSC queue) |
 | `VstHost_Process` | Drain MIDI → VST `process` → planar stereo float buffers |
+| `VstHost_GetParameterCount` / `GetParameterInfo` | Enumerate controller parameters |
+| `VstHost_Get/SetParameterNormalized` | Read/write normalized [0,1] (queues audio-thread change) |
+| `VstHost_GetProgramCount` / `GetProgramName` / `SetProgram` | Best-effort presets |
+| `VstHost_GetState` / `SetState` | Component + controller state blob |
 
 ## Smoke test
 

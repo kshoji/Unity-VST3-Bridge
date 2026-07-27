@@ -16,9 +16,12 @@
 #include "public.sdk/source/vst/hosting/eventlist.h"
 #include "public.sdk/source/vst/hosting/parameterchanges.h"
 #include "public.sdk/source/vst/hosting/processdata.h"
+#include "public.sdk/source/common/memorystream.h"
 #include "pluginterfaces/vst/ivstprocesscontext.h"
+#include "pluginterfaces/vst/ivstunits.h"
 
 #include <atomic>
+#include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <mutex>
@@ -94,6 +97,42 @@ private:
     std::atomic<uint32_t> readIndex{0};
 };
 
+struct PluginInstance;
+
+struct HostComponentHandler : public Steinberg::Vst::IComponentHandler
+{
+    PluginInstance* owner = nullptr;
+
+    Steinberg::tresult PLUGIN_API queryInterface(const Steinberg::TUID _iid, void** obj) override
+    {
+        QUERY_INTERFACE(_iid, obj, Steinberg::FUnknown::iid, Steinberg::Vst::IComponentHandler)
+        QUERY_INTERFACE(_iid, obj, Steinberg::Vst::IComponentHandler::iid, Steinberg::Vst::IComponentHandler)
+        *obj = nullptr;
+        return Steinberg::kNoInterface;
+    }
+
+    Steinberg::uint32 PLUGIN_API addRef() override { return 1; }
+    Steinberg::uint32 PLUGIN_API release() override { return 1; }
+
+    Steinberg::tresult PLUGIN_API beginEdit(Steinberg::Vst::ParamID /*id*/) override
+    {
+        return Steinberg::kResultOk;
+    }
+
+    Steinberg::tresult PLUGIN_API performEdit(Steinberg::Vst::ParamID id,
+                                              Steinberg::Vst::ParamValue valueNormalized) override;
+
+    Steinberg::tresult PLUGIN_API endEdit(Steinberg::Vst::ParamID /*id*/) override
+    {
+        return Steinberg::kResultOk;
+    }
+
+    Steinberg::tresult PLUGIN_API restartComponent(Steinberg::int32 /*flags*/) override
+    {
+        return Steinberg::kResultOk;
+    }
+};
+
 struct PluginInstance
 {
     VST3::Hosting::Module::Ptr module;
@@ -101,8 +140,10 @@ struct PluginInstance
     Steinberg::IPtr<Steinberg::Vst::IAudioProcessor> processor;
     Steinberg::IPtr<Steinberg::Vst::IEditController> controller;
     Steinberg::IPtr<Steinberg::Vst::IMidiMapping> midiMapping;
+    Steinberg::IPtr<Steinberg::Vst::IUnitInfo> unitInfo;
     Steinberg::IPtr<Steinberg::Vst::ConnectionProxy> componentCP;
     Steinberg::IPtr<Steinberg::Vst::ConnectionProxy> controllerCP;
+    HostComponentHandler componentHandler{};
     bool controllerOwnedSeparately = false;
     bool active = false;
     bool processing = false;
@@ -110,19 +151,35 @@ struct PluginInstance
     Steinberg::Vst::EventList inputEvents{128};
     Steinberg::Vst::ParameterChanges inputParams{64};
     Steinberg::Vst::ParameterChanges outputParams{64};
+    Steinberg::Vst::ParameterChangeTransfer paramTransfer{256};
     Steinberg::Vst::HostProcessData processData;
     Steinberg::Vst::ProcessContext processContext{};
     std::vector<float> silentScratch;
     bool processPrepared = false;
     int32_t audioInputChannels = 0;
     int32_t audioOutputChannels = 0;
+    // Cached program-change parameter (ParamID) when present; kNoParamId otherwise.
+    Steinberg::Vst::ParamID programChangeParamId = Steinberg::Vst::kNoParamId;
+    int32_t programChangeStepCount = 0;
 };
+
+Steinberg::tresult PLUGIN_API HostComponentHandler::performEdit(
+    Steinberg::Vst::ParamID id,
+    Steinberg::Vst::ParamValue valueNormalized)
+{
+    if (owner)
+        owner->paramTransfer.addChange(id, valueNormalized, 0);
+    return Steinberg::kResultOk;
+}
 
 bool prepareAudioProcess(PluginInstance& inst); // defined after g_state
 
 void tryBindMidiMapping(PluginInstance& inst)
 {
     inst.midiMapping.reset();
+    inst.unitInfo.reset();
+    inst.programChangeParamId = Steinberg::Vst::kNoParamId;
+    inst.programChangeStepCount = 0;
     if (!inst.controller)
         return;
 
@@ -133,6 +190,35 @@ void tryBindMidiMapping(PluginInstance& inst)
     {
         inst.midiMapping = Steinberg::owned(mapping);
     }
+
+    Steinberg::Vst::IUnitInfo* units = nullptr;
+    if (inst.controller->queryInterface(Steinberg::Vst::IUnitInfo::iid,
+                                         reinterpret_cast<void**>(&units))
+        == Steinberg::kResultTrue)
+    {
+        inst.unitInfo = Steinberg::owned(units);
+    }
+
+    const int32_t count = inst.controller->getParameterCount();
+    for (int32_t i = 0; i < count; ++i)
+    {
+        Steinberg::Vst::ParameterInfo info{};
+        if (inst.controller->getParameterInfo(i, info) != Steinberg::kResultOk)
+            continue;
+        if ((info.flags & Steinberg::Vst::ParameterInfo::kIsProgramChange) != 0)
+        {
+            inst.programChangeParamId = info.id;
+            inst.programChangeStepCount = info.stepCount;
+            break;
+        }
+    }
+}
+
+void bindComponentHandler(PluginInstance& inst)
+{
+    inst.componentHandler.owner = &inst;
+    if (inst.controller)
+        inst.controller->setComponentHandler(&inst.componentHandler);
 }
 
 void pushMappedParam(PluginInstance& inst,
@@ -158,13 +244,9 @@ void pushMappedParam(PluginInstance& inst,
 }
 
 // Convert queued MIDI 1.0 short messages into VST3 EventList / ParameterChanges.
-// Note / poly pressure → EventList. CC / channel pressure / pitch bend →
-// IMidiMapping parameter changes when available.
+// Caller must clear inputEvents / inputParams before calling.
 void drainMidiQueue(PluginInstance& inst)
 {
-    inst.inputEvents.clear();
-    inst.inputParams.clearQueue();
-
     Midi1Message msg{};
     while (inst.midiQueue.tryPop(msg))
     {
@@ -417,6 +499,11 @@ void destroyInstance(PluginInstance& inst)
         inst.processPrepared = false;
     }
     inst.silentScratch.clear();
+    inst.paramTransfer.removeChanges();
+    if (inst.controller)
+        inst.controller->setComponentHandler(nullptr);
+    inst.componentHandler.owner = nullptr;
+    inst.unitInfo.reset();
     inst.midiMapping.reset();
     inst.processor.reset();
     inst.controller.reset();
@@ -438,6 +525,7 @@ bool setupControllerAndConnect(PluginInstance& inst, const VST3::Hosting::Plugin
         inst.controller = Steinberg::owned(ctrlFromComponent);
         inst.controllerOwnedSeparately = false;
         tryBindMidiMapping(inst);
+        bindComponentHandler(inst);
         return true;
     }
 
@@ -469,6 +557,7 @@ bool setupControllerAndConnect(PluginInstance& inst, const VST3::Hosting::Plugin
     }
 
     tryBindMidiMapping(inst);
+    bindComponentHandler(inst);
     return true;
 }
 
@@ -834,7 +923,10 @@ VSTHOST_API VstHostResult VstHost_Process(VstPluginId id,
 
     using namespace Steinberg::Vst;
 
+    inst->inputEvents.clear();
+    inst->inputParams.clearQueue();
     drainMidiQueue(*inst);
+    inst->paramTransfer.transferChangesTo(inst->inputParams);
     inst->outputParams.clearQueue();
 
     inst->processContext.sampleRate = static_cast<double>(g_state.sampleRate);
@@ -910,5 +1002,335 @@ VSTHOST_API VstHostResult VstHost_Process(VstPluginId id,
 
     if (result != Steinberg::kResultOk)
         return kVstHostErrorProcessFailed;
+    return kVstHostOk;
+}
+
+// ---------------------------------------------------------------------------
+// Parameters / Programs / State (Phase 6)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+PluginInstance* findInstance(VstPluginId id)
+{
+    std::lock_guard lock(g_mutex);
+    if (!g_state.initialized)
+        return nullptr;
+    auto it = g_instances.find(id);
+    if (it == g_instances.end())
+        return nullptr;
+    return it->second.get();
+}
+
+void copyString128(char16_t* dst, size_t dstChars, const Steinberg::Vst::String128 src)
+{
+    if (!dst || dstChars == 0)
+        return;
+    size_t i = 0;
+    for (; i + 1 < dstChars && src[i] != 0; ++i)
+        dst[i] = static_cast<char16_t>(src[i]);
+    dst[i] = 0;
+}
+
+constexpr uint32_t kStateMagic = 0x31534856u; // 'VHS1' LE
+
+bool writeU32(std::vector<uint8_t>& out, uint32_t v)
+{
+    out.push_back(static_cast<uint8_t>(v & 0xff));
+    out.push_back(static_cast<uint8_t>((v >> 8) & 0xff));
+    out.push_back(static_cast<uint8_t>((v >> 16) & 0xff));
+    out.push_back(static_cast<uint8_t>((v >> 24) & 0xff));
+    return true;
+}
+
+bool readU32(const uint8_t*& p, const uint8_t* end, uint32_t& v)
+{
+    if (end - p < 4)
+        return false;
+    v = static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8)
+        | (static_cast<uint32_t>(p[2]) << 16) | (static_cast<uint32_t>(p[3]) << 24);
+    p += 4;
+    return true;
+}
+
+} // namespace
+
+VSTHOST_API VstHostResult VstHost_GetParameterCount(VstPluginId id, int32_t* outCount)
+{
+    if (!outCount)
+        return kVstHostErrorInvalidArgument;
+    *outCount = 0;
+    auto* inst = findInstance(id);
+    if (!inst)
+        return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
+    if (!inst->controller)
+        return kVstHostErrorNotSupported;
+    *outCount = inst->controller->getParameterCount();
+    return kVstHostOk;
+}
+
+VSTHOST_API VstHostResult VstHost_GetParameterInfo(VstPluginId id,
+                                                   int32_t index,
+                                                   VstParamInfo* outInfo)
+{
+    if (!outInfo || index < 0)
+        return kVstHostErrorInvalidArgument;
+    auto* inst = findInstance(id);
+    if (!inst)
+        return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
+    if (!inst->controller)
+        return kVstHostErrorNotSupported;
+
+    Steinberg::Vst::ParameterInfo info{};
+    if (inst->controller->getParameterInfo(index, info) != Steinberg::kResultOk)
+        return kVstHostErrorInvalidArgument;
+
+    std::memset(outInfo, 0, sizeof(*outInfo));
+    outInfo->id = info.id;
+    copyString128(outInfo->title, 128, info.title);
+    copyString128(outInfo->shortTitle, 128, info.shortTitle);
+    copyString128(outInfo->units, 128, info.units);
+    outInfo->stepCount = info.stepCount;
+    outInfo->defaultNormalized = info.defaultNormalizedValue;
+    outInfo->flags = info.flags;
+    return kVstHostOk;
+}
+
+VSTHOST_API VstHostResult VstHost_GetParameterNormalized(VstPluginId id,
+                                                         uint32_t paramId,
+                                                         double* outValue)
+{
+    if (!outValue)
+        return kVstHostErrorInvalidArgument;
+    *outValue = 0.0;
+    auto* inst = findInstance(id);
+    if (!inst)
+        return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
+    if (!inst->controller)
+        return kVstHostErrorNotSupported;
+    *outValue = inst->controller->getParamNormalized(paramId);
+    return kVstHostOk;
+}
+
+VSTHOST_API VstHostResult VstHost_SetParameterNormalized(VstPluginId id,
+                                                         uint32_t paramId,
+                                                         double value)
+{
+    if (value < 0.0)
+        value = 0.0;
+    if (value > 1.0)
+        value = 1.0;
+
+    auto* inst = findInstance(id);
+    if (!inst)
+        return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
+    if (!inst->controller)
+        return kVstHostErrorNotSupported;
+
+    // UI-thread controller update + audio-thread queue for process.
+    if (inst->controller->setParamNormalized(paramId, value) != Steinberg::kResultOk)
+        return kVstHostErrorInvalidArgument;
+    inst->paramTransfer.addChange(paramId, value, 0);
+    return kVstHostOk;
+}
+
+VSTHOST_API VstHostResult VstHost_GetProgramCount(VstPluginId id, int32_t* outCount)
+{
+    if (!outCount)
+        return kVstHostErrorInvalidArgument;
+    *outCount = 0;
+    auto* inst = findInstance(id);
+    if (!inst)
+        return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
+
+    if (inst->unitInfo)
+    {
+        const int32_t lists = inst->unitInfo->getProgramListCount();
+        if (lists > 0)
+        {
+            Steinberg::Vst::ProgramListInfo listInfo{};
+            if (inst->unitInfo->getProgramListInfo(0, listInfo) == Steinberg::kResultOk)
+            {
+                *outCount = listInfo.programCount;
+                return kVstHostOk;
+            }
+        }
+    }
+
+    if (inst->programChangeParamId != Steinberg::Vst::kNoParamId && inst->programChangeStepCount > 0)
+    {
+        *outCount = inst->programChangeStepCount + 1;
+        return kVstHostOk;
+    }
+    return kVstHostErrorNotSupported;
+}
+
+VSTHOST_API VstHostResult VstHost_GetProgramName(VstPluginId id,
+                                                 int32_t index,
+                                                 char16_t* outName,
+                                                 int32_t nameChars)
+{
+    if (!outName || nameChars <= 0 || index < 0)
+        return kVstHostErrorInvalidArgument;
+    outName[0] = 0;
+
+    auto* inst = findInstance(id);
+    if (!inst)
+        return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
+
+    if (inst->unitInfo)
+    {
+        const int32_t lists = inst->unitInfo->getProgramListCount();
+        if (lists > 0)
+        {
+            Steinberg::Vst::ProgramListInfo listInfo{};
+            if (inst->unitInfo->getProgramListInfo(0, listInfo) == Steinberg::kResultOk
+                && index < listInfo.programCount)
+            {
+                Steinberg::Vst::String128 name{};
+                if (inst->unitInfo->getProgramName(listInfo.id, index, name) == Steinberg::kResultOk)
+                {
+                    copyString128(outName, static_cast<size_t>(nameChars), name);
+                    return kVstHostOk;
+                }
+            }
+        }
+    }
+
+    if (inst->programChangeParamId != Steinberg::Vst::kNoParamId
+        && inst->programChangeStepCount > 0
+        && index <= inst->programChangeStepCount)
+    {
+        // Fallback label when IUnitInfo has no names.
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "Program %d", index);
+        size_t i = 0;
+        for (; i + 1 < static_cast<size_t>(nameChars) && buf[i]; ++i)
+            outName[i] = static_cast<char16_t>(buf[i]);
+        outName[i] = 0;
+        return kVstHostOk;
+    }
+    return kVstHostErrorNotSupported;
+}
+
+VSTHOST_API VstHostResult VstHost_SetProgram(VstPluginId id, int32_t index)
+{
+    if (index < 0)
+        return kVstHostErrorInvalidArgument;
+    auto* inst = findInstance(id);
+    if (!inst)
+        return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
+    if (!inst->controller || inst->programChangeParamId == Steinberg::Vst::kNoParamId)
+        return kVstHostErrorNotSupported;
+
+    double normalized = 0.0;
+    if (inst->programChangeStepCount > 0)
+        normalized = static_cast<double>(index) / static_cast<double>(inst->programChangeStepCount);
+    return VstHost_SetParameterNormalized(id, inst->programChangeParamId, normalized);
+}
+
+VSTHOST_API VstHostResult VstHost_GetState(VstPluginId id,
+                                           uint8_t* buffer,
+                                           int32_t bufferSize,
+                                           int32_t* outWritten)
+{
+    if (!outWritten)
+        return kVstHostErrorInvalidArgument;
+    *outWritten = 0;
+
+    auto* inst = findInstance(id);
+    if (!inst)
+        return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
+    if (!inst->component)
+        return kVstHostErrorNotSupported;
+
+    Steinberg::MemoryStream compStream;
+    Steinberg::MemoryStream ctrlStream;
+    inst->component->getState(&compStream);
+    if (inst->controller)
+        inst->controller->getState(&ctrlStream);
+
+    compStream.truncateToCursor();
+    ctrlStream.truncateToCursor();
+    const auto cLen = static_cast<uint32_t>(compStream.getSize());
+    const auto tLen = static_cast<uint32_t>(ctrlStream.getSize());
+
+    const int32_t needed = static_cast<int32_t>(4 + 4 + cLen + 4 + tLen);
+    *outWritten = needed;
+    if (!buffer || bufferSize < needed)
+        return kVstHostErrorBufferTooSmall;
+
+    std::vector<uint8_t> blob;
+    blob.reserve(static_cast<size_t>(needed));
+    writeU32(blob, kStateMagic);
+    writeU32(blob, cLen);
+    if (cLen > 0 && compStream.getData())
+        blob.insert(blob.end(),
+                    reinterpret_cast<uint8_t*>(compStream.getData()),
+                    reinterpret_cast<uint8_t*>(compStream.getData()) + cLen);
+    writeU32(blob, tLen);
+    if (tLen > 0 && ctrlStream.getData())
+        blob.insert(blob.end(),
+                    reinterpret_cast<uint8_t*>(ctrlStream.getData()),
+                    reinterpret_cast<uint8_t*>(ctrlStream.getData()) + tLen);
+
+    std::memcpy(buffer, blob.data(), blob.size());
+    *outWritten = static_cast<int32_t>(blob.size());
+    return kVstHostOk;
+}
+
+VSTHOST_API VstHostResult VstHost_SetState(VstPluginId id,
+                                           const uint8_t* buffer,
+                                           int32_t size)
+{
+    if (!buffer || size < 12)
+        return kVstHostErrorInvalidArgument;
+
+    auto* inst = findInstance(id);
+    if (!inst)
+        return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
+    if (!inst->component)
+        return kVstHostErrorNotSupported;
+
+    const uint8_t* p = buffer;
+    const uint8_t* end = buffer + size;
+    uint32_t magic = 0, cLen = 0, tLen = 0;
+    if (!readU32(p, end, magic) || magic != kStateMagic)
+        return kVstHostErrorInvalidArgument;
+    if (!readU32(p, end, cLen))
+        return kVstHostErrorInvalidArgument;
+    if (end - p < static_cast<ptrdiff_t>(cLen))
+        return kVstHostErrorInvalidArgument;
+    const uint8_t* cBytes = p;
+    p += cLen;
+    if (!readU32(p, end, tLen))
+        return kVstHostErrorInvalidArgument;
+    if (end - p < static_cast<ptrdiff_t>(tLen))
+        return kVstHostErrorInvalidArgument;
+    const uint8_t* tBytes = p;
+
+    if (cLen > 0)
+    {
+        Steinberg::MemoryStream compStream(const_cast<uint8_t*>(cBytes), cLen);
+        Steinberg::int64 dummy = 0;
+        compStream.seek(0, Steinberg::IBStream::kIBSeekSet, &dummy);
+        if (inst->component->setState(&compStream) != Steinberg::kResultOk)
+            return kVstHostErrorLoadFailed;
+        if (inst->controller)
+        {
+            compStream.seek(0, Steinberg::IBStream::kIBSeekSet, &dummy);
+            inst->controller->setComponentState(&compStream);
+        }
+    }
+
+    if (tLen > 0 && inst->controller)
+    {
+        Steinberg::MemoryStream ctrlStream(const_cast<uint8_t*>(tBytes), tLen);
+        Steinberg::int64 dummy = 0;
+        ctrlStream.seek(0, Steinberg::IBStream::kIBSeekSet, &dummy);
+        if (inst->controller->setState(&ctrlStream) != Steinberg::kResultOk)
+            return kVstHostErrorLoadFailed;
+    }
+
     return kVstHostOk;
 }

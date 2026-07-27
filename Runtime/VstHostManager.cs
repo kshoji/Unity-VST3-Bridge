@@ -320,6 +320,119 @@ namespace jp.kshoji.unity.vst3nativehost
             }
         }
 
+        public List<VstParamInfo> GetParameters(int pluginId)
+        {
+            var list = new List<VstParamInfo>();
+            if (!initialized) return list;
+
+            var result = VstHostNative.VstHost_GetParameterCount(pluginId, out var count);
+            if (result != VstHostResult.Ok || count <= 0)
+                return list;
+
+            for (var i = 0; i < count; i++)
+            {
+                if (VstHostNative.VstHost_GetParameterInfo(pluginId, i, out var info) == VstHostResult.Ok)
+                    list.Add(info);
+            }
+            return list;
+        }
+
+        public bool TryGetParameterNormalized(int pluginId, uint paramId, out double value)
+        {
+            value = 0;
+            if (!initialized) return false;
+            return VstHostNative.VstHost_GetParameterNormalized(pluginId, paramId, out value) == VstHostResult.Ok;
+        }
+
+        public bool SetParameterNormalized(int pluginId, uint paramId, double value)
+        {
+            if (!initialized) return false;
+            var result = VstHostNative.VstHost_SetParameterNormalized(pluginId, paramId, value);
+            if (result != VstHostResult.Ok)
+            {
+                Debug.LogWarning($"[VstHost] SetParameterNormalized failed id={pluginId} param={paramId}: {result}");
+                return false;
+            }
+            return true;
+        }
+
+        public List<string> GetPrograms(int pluginId)
+        {
+            var list = new List<string>();
+            if (!initialized) return list;
+
+            var result = VstHostNative.VstHost_GetProgramCount(pluginId, out var count);
+            if (result != VstHostResult.Ok || count <= 0)
+                return list;
+
+            var buffer = Marshal.AllocHGlobal(256 * sizeof(char));
+            try
+            {
+                for (var i = 0; i < count; i++)
+                {
+                    if (VstHostNative.VstHost_GetProgramName(pluginId, i, buffer, 256) != VstHostResult.Ok)
+                    {
+                        list.Add($"Program {i}");
+                        continue;
+                    }
+                    list.Add(Marshal.PtrToStringUni(buffer) ?? $"Program {i}");
+                }
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+            return list;
+        }
+
+        public bool SetProgram(int pluginId, int index)
+        {
+            if (!initialized) return false;
+            var result = VstHostNative.VstHost_SetProgram(pluginId, index);
+            if (result != VstHostResult.Ok)
+            {
+                Debug.LogWarning($"[VstHost] SetProgram failed id={pluginId} index={index}: {result}");
+                return false;
+            }
+            return true;
+        }
+
+        public byte[] GetState(int pluginId)
+        {
+            if (!initialized) return null;
+
+            var probe = VstHostNative.VstHost_GetState(pluginId, null, 0, out var needed);
+            if (probe != VstHostResult.ErrorBufferTooSmall && probe != VstHostResult.Ok)
+            {
+                Debug.LogWarning($"[VstHost] GetState failed id={pluginId}: {probe}");
+                return null;
+            }
+            if (needed <= 0) return Array.Empty<byte>();
+
+            var buffer = new byte[needed];
+            var result = VstHostNative.VstHost_GetState(pluginId, buffer, buffer.Length, out var written);
+            if (result != VstHostResult.Ok)
+            {
+                Debug.LogWarning($"[VstHost] GetState copy failed id={pluginId}: {result}");
+                return null;
+            }
+            if (written != buffer.Length)
+                Array.Resize(ref buffer, written);
+            return buffer;
+        }
+
+        public bool SetState(int pluginId, byte[] state)
+        {
+            if (!initialized || state == null || state.Length == 0) return false;
+            var result = VstHostNative.VstHost_SetState(pluginId, state, state.Length);
+            if (result != VstHostResult.Ok)
+            {
+                Debug.LogWarning($"[VstHost] SetState failed id={pluginId}: {result}");
+                return false;
+            }
+            return true;
+        }
+
         public void Dispose()
         {
             Terminate();
