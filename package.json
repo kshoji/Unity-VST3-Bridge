@@ -16,7 +16,7 @@
     "samples": [
         {
             "displayName": "VST3 Host Sample",
-            "description": "Scan/load VST3 plugins, play manual notes, and optionally wire Unity MIDI Plugin (Windows x64).",
+            "description": "Scan/load VST3 plugins, play manual notes, and optionally wire Unity MIDI Plugin (Windows + macOS).",
             "path": "Samples~/VstHostSample"
         }
     ]

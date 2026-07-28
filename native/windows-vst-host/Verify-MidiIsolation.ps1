@@ -29,6 +29,8 @@ Write-Host "MIDI root: $MidiRepoRoot"
 $forbiddenNamePatterns = @(
     "VstHostNative.dll",
     "VstHostNative.pdb",
+    "VstHostNative.bundle",
+    "VstHostNative.dylib",
     "jp.kshoji.unity.vst3nativehost"
 )
 

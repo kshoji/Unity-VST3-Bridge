@@ -49,7 +49,8 @@ cmake --build build --config Release
 .\build\bin\Release\VstHostSmokeTest.exe
 ```
 
-Expects SDK sample `again.vst3` under `C:\Program Files\Common Files\VST3`.
+Expects SDK sample `again.vst3` under the platform default VST3 folder, or set
+`VSTHOST_SMOKE_FOLDER` to an explicit scan directory.
 
 ## VST3 SDK
 

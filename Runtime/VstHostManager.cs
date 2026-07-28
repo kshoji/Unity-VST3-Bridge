@@ -60,11 +60,19 @@ namespace jp.kshoji.unity.vst3nativehost
         }
 
         /// <summary>
-        /// Windows standard VST3 folders (Common Files + user Common Files).
+        /// OS-standard VST3 folders (Windows Common Files / macOS Library paths).
+        /// Prefer <see cref="Scan"/> with a null/empty folder so the native bridge
+        /// uses SDK <c>Module::getModulePaths()</c> for the current platform.
         /// </summary>
         public static IReadOnlyList<string> GetDefaultScanFolders()
         {
             var list = new List<string>(2);
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.Personal);
+            if (!string.IsNullOrEmpty(home))
+                list.Add(Path.Combine(home, "Library", "Audio", "Plug-Ins", "VST3"));
+            list.Add("/Library/Audio/Plug-Ins/VST3");
+#else
             var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonProgramFiles);
             if (!string.IsNullOrEmpty(programData))
                 list.Add(Path.Combine(programData, "VST3"));
@@ -73,7 +81,7 @@ namespace jp.kshoji.unity.vst3nativehost
             var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             if (!string.IsNullOrEmpty(localAppData))
                 list.Add(Path.Combine(localAppData, "Programs", "Common", "VST3"));
-
+#endif
             return list;
         }
 

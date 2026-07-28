@@ -18,23 +18,26 @@ Local development:
 "jp.kshoji.unity.vst3nativehost": "file:C:/path/to/Unity-VST3-Bridge"
 ```
 
-Requires `Plugins/Windows/x86_64/VstHostNative.dll` (and ARM64 for Windows
-ARM64 builds). Rebuild with `native/windows-vst-host/Build.ps1 -Install`.
+Requires native bridge binaries:
+
+- Windows: `Plugins/Windows/x86_64/VstHostNative.dll` (+ ARM64 for Windows ARM64)
+  — rebuild with `native/windows-vst-host/Build.ps1 -Install`
+- macOS: `Plugins/macOS/VstHostNative.bundle` (Universal)
+  — rebuild with `native/macos-vst-host/Build.sh --Install`
 
 ## Scan paths
 
 `VstHostManager.Scan()` / `VstHost_ScanFolder` with an empty or null folder
-uses the VST3 SDK’s `Module::getModulePaths()` on Windows, which typically
-covers:
+uses the VST3 SDK’s `Module::getModulePaths()` for the **current OS**:
 
-| Location | Example |
-|----------|---------|
-| Common Program Files | `C:\Program Files\Common Files\VST3` |
-| Per-user common | `%LOCALAPPDATA%\Programs\Common\VST3` (FOLDERID_UserProgramFilesCommon) |
-| Host app folder | `<Unity or player exe directory>\VST3` |
+| OS | Typical locations |
+|----|-------------------|
+| Windows | `C:\Program Files\Common Files\VST3`; `%LOCALAPPDATA%\Programs\Common\VST3`; `<host>\VST3` |
+| macOS | `~/Library/Audio/Plug-Ins/VST3`; `/Library/Audio/Plug-Ins/VST3`; app-local `VST3` |
 
-You can also pass an explicit folder path to scan only that tree (bundle and
-flat `.vst3` layouts are supported).
+`GetDefaultScanFolders()` mirrors those paths in C# for UI / tooling. You can
+also pass an explicit folder path to scan only that tree (bundle and flat
+`.vst3` layouts are supported).
 
 Do **not** redistribute third-party `.vst3` files with your project or this
 package. Install plugins on the machine that runs the host.

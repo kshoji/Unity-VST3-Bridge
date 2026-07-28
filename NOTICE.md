@@ -1,7 +1,8 @@
 # NOTICE — Unity Plugin Host for VST3
 
 This package hosts VST3 instruments and effects through a native bridge
-(`VstHostNative.dll`), with optional integration to Unity MIDI Plugin.
+(`VstHostNative` — Windows `.dll` / macOS `.bundle`), with optional integration
+to Unity MIDI Plugin.
 
 ## Package license
 
@@ -31,14 +32,21 @@ submodule is present).
 ```powershell
 # After cloning Unity-VST3-Bridge
 git submodule update --init --recursive -- native/windows-vst-host/vst3sdk
-# Then build / install the DLL:
+# Windows:
 cd native/windows-vst-host
 .\Build.ps1 -Install
 ```
 
+```bash
+# macOS (same SDK submodule path):
+cd native/macos-vst-host
+./Build.sh --Install
+```
+
 UPM / registry packages **do not** include `native/` (see `.npmignore`).
-End users who only consume the prebuilt `Plugins/.../VstHostNative.dll`
-do not need a local SDK checkout. Rebuilders and contributors do.
+End users who only consume the prebuilt `Plugins/.../VstHostNative`
+(`.dll` / `.bundle`) do not need a local SDK checkout. Rebuilders and
+contributors do.
 
 ### SDK license (summary)
 
@@ -60,12 +68,13 @@ that license.
 | Redistributed with this UPM package | Not redistributed |
 |-------------------------------------|-------------------|
 | Prebuilt `VstHostNative.dll` (Windows) | Full VST3 SDK source tree (`native/`) |
-| Runtime / Editor C# | Third-party commercial `.vst3` plugins |
-| Documentation under `Documentation~/` | Sample `.vst3` binaries used only on developer machines |
+| Prebuilt `VstHostNative.bundle` (macOS Universal) | Third-party commercial `.vst3` plugins |
+| Runtime / Editor C# | Sample `.vst3` binaries used only on developer machines |
+| Documentation under `Documentation~/` | |
 
 ## Distribution boundary (MIDI)
 
-- Do **not** ship the VST3 SDK, `VstHostNative.dll`, or VST host C# inside
+- Do **not** ship the VST3 SDK, `VstHostNative` (`.dll` / `.bundle`), or VST host C# inside
   Unity MIDI Plugin releases.
 - Do **not** place VST host implementation under `Assets/MIDI`.
 - Keep VST host code, native binaries, trademarks notices, and SDK

@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cmath>
+#include <cstdlib>
 #include <string>
 #include <vector>
 #include <algorithm>
@@ -8,6 +9,13 @@
 #include <thread>
 
 #include "VstHostNative.h"
+
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+#endif
 
 struct ScannedEntry
 {
@@ -39,9 +47,59 @@ static std::string toNarrow(const std::u16string& s)
     return out;
 }
 
+static std::u16string utf8ToU16(const char* utf8)
+{
+    if (!utf8 || !*utf8)
+        return {};
+#if defined(_WIN32)
+    const int len = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, nullptr, 0);
+    if (len <= 1)
+        return {};
+    std::wstring wide(static_cast<size_t>(len - 1), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, utf8, -1, wide.data(), len);
+    return std::u16string(wide.begin(), wide.end());
+#else
+    // ASCII / UTF-8 BMP subset used by smoke paths; expand code units simply.
+    std::u16string out;
+    out.reserve(std::char_traits<char>::length(utf8));
+    for (const unsigned char* p = reinterpret_cast<const unsigned char*>(utf8); *p; ++p)
+    {
+        if (*p < 0x80)
+            out.push_back(static_cast<char16_t>(*p));
+        else if ((*p & 0xE0) == 0xC0 && p[1])
+        {
+            out.push_back(static_cast<char16_t>(((p[0] & 0x1F) << 6) | (p[1] & 0x3F)));
+            ++p;
+        }
+        else if ((*p & 0xF0) == 0xE0 && p[1] && p[2])
+        {
+            out.push_back(static_cast<char16_t>(((p[0] & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F)));
+            p += 2;
+        }
+        else
+            out.push_back(u'?');
+    }
+    return out;
+#endif
+}
+
+static std::u16string resolveSmokeFolder()
+{
+    if (const char* env = std::getenv("VSTHOST_SMOKE_FOLDER"))
+        return utf8ToU16(env);
+
+#if defined(_WIN32)
+    return u"C:\\Program Files\\Common Files\\VST3";
+#else
+    // Empty → native ScanFolder uses SDK getModulePaths() (Library VST3 folders).
+    return {};
+#endif
+}
+
 int main()
 {
-    const wchar_t* folder = L"C:\\Program Files\\Common Files\\VST3";
+    const std::u16string folderStorage = resolveSmokeFolder();
+    const char16_t* folder = folderStorage.empty() ? nullptr : folderStorage.c_str();
 
     printf("Initialize...\n");
     if (VstHost_Initialize(48000, 512) != kVstHostOk)
@@ -51,8 +109,11 @@ int main()
     }
 
     std::vector<ScannedEntry> entries;
-    printf("ScanFolder: %ls\n", folder);
-    if (VstHost_ScanFolder(reinterpret_cast<const char16_t*>(folder), OnScan, &entries) != kVstHostOk)
+    if (folder)
+        printf("ScanFolder: %s\n", toNarrow(folderStorage).c_str());
+    else
+        printf("ScanFolder: <SDK default paths>\n");
+    if (VstHost_ScanFolder(folder, OnScan, &entries) != kVstHostOk)
     {
         printf("FAIL: ScanFolder\n");
         VstHost_Terminate();

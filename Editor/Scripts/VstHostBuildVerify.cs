@@ -9,13 +9,15 @@ using UnityEngine;
 namespace jp.kshoji.unity.vst3nativehost.Editor
 {
     /// <summary>
-    /// Phase 7 helpers: plugin platform flags + optional IL2CPP Win64 player build.
-    /// Batchmode: -executeMethod jp.kshoji.unity.vst3nativehost.Editor.VstHostBuildVerify.BuildIl2CppWin64
+    /// Plugin platform flags + optional Standalone verify builds (Win64 IL2CPP / OSX).
+    /// Batchmode Win64: -executeMethod jp.kshoji.unity.vst3nativehost.Editor.VstHostBuildVerify.BuildIl2CppWin64
+    /// Batchmode OSX: -executeMethod jp.kshoji.unity.vst3nativehost.Editor.VstHostBuildVerify.BuildStandaloneOSX
     /// </summary>
     public static class VstHostBuildVerify
     {
         private const string DllRelativeX64 = "Plugins/Windows/x86_64/VstHostNative.dll";
         private const string DllRelativeArm64 = "Plugins/Windows/ARM64/VstHostNative.dll";
+        private const string BundleRelativeMac = "Plugins/macOS/VstHostNative.bundle";
 
         [MenuItem("Window/VST3 Host/Verify Plugin Platforms")]
         public static void VerifyPluginPlatformsMenu()
@@ -34,9 +36,23 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
                 throw new BuildFailedException($"IL2CPP Win64 verify build failed with code {code}");
         }
 
+        [MenuItem("Window/VST3 Host/Build Standalone OSX (Verify)")]
+        public static void BuildStandaloneOSXMenu()
+        {
+            var code = BuildStandaloneOSXInternal();
+            if (code != 0)
+                throw new BuildFailedException($"Standalone OSX verify build failed with code {code}");
+        }
+
         public static void BuildIl2CppWin64()
         {
             var code = BuildIl2CppWin64Internal();
+            EditorApplication.Exit(code);
+        }
+
+        public static void BuildStandaloneOSX()
+        {
+            var code = BuildStandaloneOSXInternal();
             EditorApplication.Exit(code);
         }
 
@@ -61,7 +77,6 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
                 return 3;
             }
 
-            // Keep build settings in sync for subsequent editor opens.
             EditorBuildSettings.scenes = new[]
             {
                 new EditorBuildSettingsScene(scene, true)
@@ -97,9 +112,65 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
             return 0;
         }
 
+        private static int BuildStandaloneOSXInternal()
+        {
+            if (!VerifyPluginPlatforms(out var pluginMsg))
+            {
+                Debug.LogError($"[VstHost] {pluginMsg}");
+                return 2;
+            }
+
+            Debug.Log($"[VstHost] {pluginMsg}");
+
+            EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Standalone, BuildTarget.StandaloneOSX);
+            // Mono is fine for verify; IL2CPP requires matching toolchain on the Mac.
+            PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone, ScriptingImplementation.Mono2x);
+
+            var scene = FindFirstEnabledScene();
+            if (string.IsNullOrEmpty(scene))
+            {
+                Debug.LogError("[VstHost] No enabled scene in Build Settings.");
+                return 3;
+            }
+
+            EditorBuildSettings.scenes = new[]
+            {
+                new EditorBuildSettingsScene(scene, true)
+            };
+
+            var outDir = Path.Combine(Directory.GetParent(Application.dataPath)!.FullName, "Builds", "OSX-Verify");
+            Directory.CreateDirectory(outDir);
+            var app = Path.Combine(outDir, "VstHostVerify.app");
+
+            var options = new BuildPlayerOptions
+            {
+                scenes = new[] { scene },
+                locationPathName = app,
+                target = BuildTarget.StandaloneOSX,
+                options = BuildOptions.None
+            };
+
+            var report = BuildPipeline.BuildPlayer(options);
+            if (report.summary.result != BuildResult.Succeeded)
+            {
+                Debug.LogError($"[VstHost] Build failed: {report.summary.result}");
+                return 4;
+            }
+
+            var bundleHits = Directory.GetDirectories(outDir, "VstHostNative.bundle", SearchOption.AllDirectories);
+            if (bundleHits.Length == 0)
+            {
+                Debug.LogError("[VstHost] Built player is missing VstHostNative.bundle");
+                return 5;
+            }
+
+            Debug.Log($"[VstHost] Standalone OSX verify OK. Bundle: {bundleHits[0]}");
+            return 0;
+        }
+
         public static bool VerifyPluginPlatforms(out string message)
         {
-            if (!TryResolveDllAssetPath(DllRelativeX64, out var x64Path))
+            if (!TryResolvePluginAssetPath(DllRelativeX64, out var x64Path))
             {
                 message = $"Could not locate {DllRelativeX64} in the package.";
                 return false;
@@ -108,7 +179,7 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
             if (!VerifyX64Importer(x64Path, out message))
                 return false;
 
-            if (!TryResolveDllAssetPath(DllRelativeArm64, out var arm64Path))
+            if (!TryResolvePluginAssetPath(DllRelativeArm64, out var arm64Path))
             {
                 message = $"Could not locate {DllRelativeArm64} in the package.";
                 return false;
@@ -117,36 +188,47 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
             if (!VerifyArm64Importer(arm64Path, out message))
                 return false;
 
-            message = $"{x64Path}: Editor + Win64 OK; {arm64Path}: Windows ARM64 OK.";
+            if (!TryResolvePluginAssetPath(BundleRelativeMac, out var macPath))
+            {
+                message = $"Could not locate {BundleRelativeMac} in the package.";
+                return false;
+            }
+
+            if (!VerifyMacImporter(macPath, out message))
+                return false;
+
+            message =
+                $"{x64Path}: Editor + Win64 OK; {arm64Path}: Windows ARM64 OK; {macPath}: Editor OSX + OSXUniversal OK.";
             return true;
         }
 
-        private static bool TryResolveDllAssetPath(string dllRelative, out string dllAssetPath)
+        private static bool TryResolvePluginAssetPath(string relative, out string assetPath)
         {
-            dllAssetPath = null;
+            assetPath = null;
             var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssembly(
                 typeof(VstHostManager).Assembly);
 
             if (packageInfo != null)
             {
-                var candidate = Path.Combine(packageInfo.assetPath, dllRelative).Replace('\\', '/');
-                if (File.Exists(Path.GetFullPath(candidate)))
+                var candidate = Path.Combine(packageInfo.assetPath, relative).Replace('\\', '/');
+                var full = Path.GetFullPath(candidate);
+                if (File.Exists(full) || Directory.Exists(full))
                 {
-                    dllAssetPath = candidate;
+                    assetPath = candidate;
                     return true;
                 }
             }
 
-            var needle = dllRelative.Replace('\\', '/');
-            var guids = AssetDatabase.FindAssets("VstHostNative t:DefaultAsset");
+            var needle = relative.Replace('\\', '/');
+            var guids = AssetDatabase.FindAssets("VstHostNative");
             foreach (var guid in guids)
             {
                 var path = AssetDatabase.GUIDToAssetPath(guid);
-                if (path.Replace('\\', '/').EndsWith(needle, StringComparison.OrdinalIgnoreCase)
-                    || (path.EndsWith("VstHostNative.dll", StringComparison.OrdinalIgnoreCase)
-                        && path.Replace('\\', '/').IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0))
+                var normalized = path.Replace('\\', '/');
+                if (normalized.EndsWith(needle, StringComparison.OrdinalIgnoreCase)
+                    || normalized.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0)
                 {
-                    dllAssetPath = path;
+                    assetPath = path;
                     return true;
                 }
             }
@@ -216,9 +298,44 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
                 return false;
             }
 
-            // Platform enablement for ARM64 is primarily driven by the .meta
-            // (Standalone: Windows ARM64). Presence of the asset is enough here.
             message = $"{dllAssetPath}: platforms OK (Windows ARM64 only).";
+            return true;
+        }
+
+        private static bool VerifyMacImporter(string bundleAssetPath, out string message)
+        {
+            var importer = AssetImporter.GetAtPath(bundleAssetPath) as PluginImporter;
+            if (importer == null)
+            {
+                message = $"PluginImporter missing for {bundleAssetPath}";
+                return false;
+            }
+
+            var anyOk = importer.GetCompatibleWithAnyPlatform();
+            var editorOk = importer.GetCompatibleWithEditor();
+            var osxOk = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneOSX);
+            var win64Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows64);
+            var win32Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows);
+
+            if (anyOk)
+            {
+                message = $"{bundleAssetPath}: must not be Compatible With Any Platform (OSX only).";
+                return false;
+            }
+
+            if (!editorOk || !osxOk)
+            {
+                message = $"{bundleAssetPath}: enable Editor (OS=OSX) + StandaloneOSX (editorOk={editorOk}, osxOk={osxOk}).";
+                return false;
+            }
+
+            if (win64Ok || win32Ok)
+            {
+                message = $"{bundleAssetPath}: Windows platforms must stay disabled.";
+                return false;
+            }
+
+            message = $"{bundleAssetPath}: platforms OK (Editor OSX + OSXUniversal).";
             return true;
         }
 
