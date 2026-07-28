@@ -75,7 +75,7 @@ VSTHOST_API VstHostResult VstHost_Process(VstPluginId id,
                                           float* outputR,
                                           int32_t numFrames);
 
-// --- Parameters (Phase 6) ---
+// --- Parameters ---
 VSTHOST_API VstHostResult VstHost_GetParameterCount(VstPluginId id, int32_t* outCount);
 VSTHOST_API VstHostResult VstHost_GetParameterInfo(VstPluginId id,
                                                    int32_t index,

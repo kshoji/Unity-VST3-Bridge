@@ -38,4 +38,4 @@ host.SetState(pluginId, state);
 
 Attach `VstHostParameterPanel`, set `PluginId`, and use the on-screen sliders.
 
-**Not supported (Phase 6):** embedding the plugin’s native editor (`IPlugView` / HWND).
+**Not supported:** embedding the plugin’s native editor (`IPlugView` / HWND).

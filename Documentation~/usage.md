@@ -97,5 +97,5 @@ Plugin-native GUI (`IPlugView`) is not hosted.
 | `midi-integration.md` | Optional MIDI adapter |
 | `parameters.md` | Parameters / presets / state |
 | `limitations.md` | Known limits |
-| `macos-portability.md` | Win / macOS native placement |
+| `package-excludes.md` | Why `native~/` stays out of UPM installs |
 | `NOTICE.md` (repo root) | Trademark / SDK / distribution |

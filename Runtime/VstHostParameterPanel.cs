@@ -5,7 +5,7 @@ namespace jp.kshoji.unity.vst3nativehost
 {
     /// <summary>
     /// Minimal host-side parameter / program UI (IMGUI).
-    /// Plugin-native GUI (IPlugView) is not supported in Phase 6.
+    /// Plugin-native GUI (IPlugView) is not supported.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class VstHostParameterPanel : MonoBehaviour

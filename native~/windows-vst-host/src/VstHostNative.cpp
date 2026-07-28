@@ -977,7 +977,7 @@ VSTHOST_API VstHostResult VstHost_Load(const char16_t* filePath,
     activateBuses(inst->component);
 
     // Prefer setActive; setProcessing can fail on some plugins before buses/process
-    // data are fully wired (Phase 5). Treat setProcessing failure as soft.
+    // data are fully wired. Treat setProcessing failure as soft.
     if (inst->component->setActive(true) != Steinberg::kResultOk)
     {
         finishDestroyInstance(std::move(inst));
@@ -1030,7 +1030,7 @@ VSTHOST_API VstHostResult VstHost_Unload(VstPluginId id)
 }
 
 // ---------------------------------------------------------------------------
-// MIDI (lock-free queue) / Audio (Phase 5 completes ring-buffer return path)
+// MIDI (lock-free queue) / Audio
 // ---------------------------------------------------------------------------
 
 VSTHOST_API VstHostResult VstHost_SendMidi1(VstPluginId id,
@@ -1218,7 +1218,7 @@ VSTHOST_API VstHostResult VstHost_Process(VstPluginId id,
 }
 
 // ---------------------------------------------------------------------------
-// Parameters / Programs / State (Phase 6)
+// Parameters / Programs / State
 // ---------------------------------------------------------------------------
 
 namespace {

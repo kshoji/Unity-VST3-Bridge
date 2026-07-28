@@ -174,7 +174,7 @@ int main()
     }
     printf("Loaded without uid id=%d\n", id);
 
-    // Phase 4: enqueue MIDI 1.0 into the lock-free queue
+    // Enqueue MIDI 1.0 into the lock-free queue
     if (VstHost_SendMidi1(id, 0x90, 60, 100) != kVstHostOk)
     {
         printf("FAIL: SendMidi1 NoteOn\n");
@@ -191,7 +191,7 @@ int main()
     }
     printf("SendMidi1 NoteOn/NoteOff ok\n");
 
-    // Phase 5: Process AGain (effect) with a sine input
+    // Process AGain (effect) with a sine input
     constexpr int kFrames = 512;
     std::vector<float> inL(kFrames), inR(kFrames), outL(kFrames), outR(kFrames);
     for (int i = 0; i < kFrames; ++i)
@@ -266,7 +266,7 @@ int main()
         printf("WARN: AGain SideChain not found; skipped\n");
     }
 
-    // Phase 6: parameters / state on AGain
+    // Parameters / state on AGain
     int32_t paramCount = 0;
     if (VstHost_GetParameterCount(id, &paramCount) != kVstHostOk || paramCount <= 0)
     {
@@ -336,7 +336,7 @@ int main()
 
     VstHost_Unload(id);
 
-    // Phase 5: Instrument path — NoteOn + silent input Process
+    // Instrument path — NoteOn + silent input Process
     const ScannedEntry* instrument = nullptr;
     for (const auto& item : entries)
     {
@@ -477,6 +477,6 @@ int main()
         return 1;
     }
 
-    printf("OK: Phase 3/4/5/6 smoke test passed\n");
+    printf("OK: smoke test passed\n");
     return 0;
 }

@@ -1,4 +1,4 @@
-# VstHostNative — macOS bridge (Phase M)
+# VstHostNative — macOS bridge
 
 Builds **`VstHostNative.bundle`** (Universal arm64 + x86_64 by default) for
 Unity `DllImport("VstHostNative")`. Shares C++ sources and the VST3 SDK submodule

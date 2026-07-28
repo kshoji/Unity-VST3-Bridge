@@ -25,7 +25,7 @@ No `?path=` suffix is needed — `package.json` is at the repository root.
 - `Plugins/Windows/ARM64/` — native bridge DLL (Standalone Windows ARM64)
 - `Plugins/macOS/` — native bridge `.bundle` (Editor OSX + Standalone OSXUniversal)
 - `Samples~/` — importable samples
-- `Documentation~/` — package documentation (usage, verification, plan, macOS portability)
+- `Documentation~/` — package documentation (usage, verification, limitations, etc.)
 - `Tests/` — optional package tests
 - `native~/` — C++ source for `VstHostNative` (**Git repo only**)
   - Trailing `~` = Unity AssetDatabase ignores this folder on Git URL / `file:` installs
@@ -43,16 +43,14 @@ No `?path=` suffix is needed — `package.json` is at the repository root.
 | [`Documentation~/parameters.md`](Documentation~/parameters.md) | Parameters / presets / state |
 | [`Documentation~/verification.md`](Documentation~/verification.md) | Manual / IL2CPP / isolation checks |
 | [`Documentation~/limitations.md`](Documentation~/limitations.md) | Known limits |
-| [`Documentation~/macos-portability.md`](Documentation~/macos-portability.md) | Win / macOS native placement + shared ABI notes |
 | [`Documentation~/package-excludes.md`](Documentation~/package-excludes.md) | Why `native~/` (Git/file: vs `.npmignore`) |
 | [`NOTICE.md`](NOTICE.md) | Trademark, VST3 SDK license, distribution boundary |
-| [`Documentation~/vst3-native-host-plan.md`](Documentation~/vst3-native-host-plan.md) | Design plan (canonical) |
 
 ## Status
 
-Phases 0–8 and **Phase M (macOS)** are complete:
-native host (Windows + macOS), MIDI, audio return, parameters / state / IMGUI panel,
-sample scene, IL2CPP Win64 / Standalone OSX verify helpers, documentation / trademark / SDK notices.
+Native host (Windows + macOS), MIDI, audio return, parameters / state / IMGUI panel,
+sample scene, IL2CPP Win64 / Standalone OSX verify helpers, and documentation /
+trademark / SDK notices are included.
 
 Import **VST3 Host Sample** from Package Manager, or follow `Documentation~/verification.md`.
 

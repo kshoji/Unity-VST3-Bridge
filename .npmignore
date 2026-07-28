@@ -11,6 +11,3 @@ Tests/**
 *.pdb
 .vs/
 .idea/
-# Root stub only; canonical plan lives under Documentation~/
-/vst3-native-host-plan.md
-/vst3-native-host-plan.md.meta

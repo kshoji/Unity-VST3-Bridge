@@ -1,4 +1,4 @@
-# Plugins/macOS — VstHostNative.bundle (Phase M)
+# Plugins/macOS — VstHostNative.bundle
 
 macOS native bridge for Unity `DllImport("VstHostNative")`.
 
@@ -39,6 +39,5 @@ the Editor creates them (same pattern as Unity MIDI Plugin’s `MIDIPlugin.bundl
 
 ## Related
 
-- Plan: `Documentation~/vst3-native-host-plan.md` → **Phase M**
-- Portability inventory: `Documentation~/macos-portability.md`
 - Native sources: `native~/macos-vst-host/`
+- Package docs: `Documentation~/usage.md`, `Documentation~/package-excludes.md`

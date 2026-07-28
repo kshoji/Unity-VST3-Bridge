@@ -78,14 +78,14 @@ namespace jp.kshoji.unity.vst3nativehost
         {
             if (loggedSkippedSysex) return;
             loggedSkippedSysex = true;
-            Debug.LogWarning("[VstHost] SysEx / unknown SysEx-like messages are skipped (Phase 4).");
+            Debug.LogWarning("[VstHost] SysEx / unknown SysEx-like messages are skipped.");
         }
 
         public static void LogSkippedPerNote()
         {
             if (loggedSkippedPerNote) return;
             loggedSkippedPerNote = true;
-            Debug.LogWarning("[VstHost] Per-note / high-resolution MIDI 2.0 controllers are skipped (Phase 4).");
+            Debug.LogWarning("[VstHost] Per-note / high-resolution MIDI 2.0 controllers are skipped.");
         }
 
         public static void LogSkippedUnknown()

@@ -41,7 +41,7 @@ done
 for root in "${search_roots[@]}"; do
   while IFS= read -r -d '' file; do
     name="$(basename "${file}")"
-    # Skip markdown plan/docs mentions
+    # Skip markdown documentation files
     if [[ "${file}" == *.md ]]; then
       continue
     fi
