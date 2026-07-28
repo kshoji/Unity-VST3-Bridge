@@ -21,9 +21,9 @@ Local development:
 Requires native bridge binaries:
 
 - Windows: `Plugins/Windows/x86_64/VstHostNative.dll` (+ ARM64 for Windows ARM64)
-  — rebuild with `native/windows-vst-host/Build.ps1 -Install`
+  — rebuild with `native~/windows-vst-host/Build.ps1 -Install`
 - macOS: `Plugins/macOS/VstHostNative.bundle` (Universal)
-  — rebuild with `native/macos-vst-host/Build.sh --Install`
+  — rebuild with `native~/macos-vst-host/Build.sh --Install`
 
 ## Scan paths
 

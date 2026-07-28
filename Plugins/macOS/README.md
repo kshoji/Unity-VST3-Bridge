@@ -14,7 +14,7 @@ Plugins/macOS/
 Build / refresh:
 
 ```bash
-cd native/macos-vst-host
+cd native~/macos-vst-host
 ./Build.sh --Install
 ```
 
@@ -39,4 +39,4 @@ the Editor creates them (same pattern as Unity MIDI Plugin’s `MIDIPlugin.bundl
 
 - Plan: `Documentation~/vst3-native-host-plan.md` → **Phase M**
 - Portability inventory: `Documentation~/macos-portability.md`
-- Native sources: `native/macos-vst-host/`
+- Native sources: `native~/macos-vst-host/`

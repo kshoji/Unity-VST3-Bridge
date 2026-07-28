@@ -20,7 +20,7 @@ if(NOT EXISTS "${VST3SDK_DIR}/public.sdk/source/vst/hosting/module_mac.mm")
     message(FATAL_ERROR
         "VST3 SDK missing module_mac.mm. Run:\n"
         "  git submodule update --init --recursive\n"
-        "from the repository root (SDK lives under native/windows-vst-host/vst3sdk).")
+        "from the repository root (SDK lives under native~/windows-vst-host/vst3sdk).")
 endif()
 
 # Avoid SMTG_VST3_SDK / smtg_detect_xcode_version: Command Line Tools builds

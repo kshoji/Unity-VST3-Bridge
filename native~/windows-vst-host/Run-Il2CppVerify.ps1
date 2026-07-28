@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Create a temp Unity project, embed this package (without native/), run IL2CPP Win64 verify.
+    Create a temp Unity project, embed this package (without native~/), run IL2CPP Win64 verify.
 #>
 param(
     [string]$UnityEditor = "D:\Program Files\Unity\Hub\Editor\2022.3.62f3\Editor\Unity.exe",
@@ -35,7 +35,7 @@ if ($create.ExitCode -ne 0) {
     throw "createProject failed: $($create.ExitCode)"
 }
 
-# Embed UPM-visible package subset (exclude native/ build tree and Samples~).
+# Embed UPM-visible package subset (exclude native~/ build tree and Samples~).
 $embedded = Join-Path $ProjectRoot "Packages\jp.kshoji.unity.vst3nativehost"
 New-Item -ItemType Directory -Force -Path $embedded | Out-Null
 $copyItems = @(

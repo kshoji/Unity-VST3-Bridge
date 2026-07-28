@@ -3,9 +3,11 @@
 ## [Unreleased]
 
 ### Added
-- **Phase M (macOS):** `native/macos-vst-host/` (CMake + `Build.sh`), Universal
+- **Phase M (macOS):** `native~/macos-vst-host/` (CMake + `Build.sh`), Universal
   `Plugins/macOS/VstHostNative.bundle`, macOS scan paths, Editor OSX verify /
   isolation helpers, documentation updates.
+- Renamed `native/` → **`native~/`** so Git URL / `file:` installs do not import
+  SDK sources (`.npmignore` alone does not apply). See `Documentation~/package-excludes.md`.
 - Initial package skeleton (Runtime, Editor, Tests, Samples~, Documentation~, Plugins).
 - Phase 8 docs: `NOTICE.md` SDK/trademark details, `Documentation~/usage.md`,
   `Documentation~/limitations.md`; plan canonical at `Documentation~/vst3-native-host-plan.md`.

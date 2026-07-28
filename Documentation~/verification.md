@@ -4,8 +4,8 @@
 
 - Unity 2022.3+ (or Unity 6)
 - Native bridge present for your Editor OS:
-  - **Windows:** `.\native\windows-vst-host\Build.ps1 -Install`
-  - **macOS:** `./native/macos-vst-host/Build.sh --Install`
+  - **Windows:** `.\native~\windows-vst-host\Build.ps1 -Install`
+  - **macOS:** `./native~/macos-vst-host/Build.sh --Install`
 - Local `.vst3` plugins (do **not** redistribute third-party plugins)
 
 ## Verification A — VST only (manual notes)
@@ -45,16 +45,16 @@ Do **not** place VST scripts under `Assets/MIDI`.
 
 ```powershell
 # Windows
-.\native\windows-vst-host\Build.ps1
-.\native\windows-vst-host\build-x64\bin\Release\VstHostSmokeTest.exe
+.\native~\windows-vst-host\Build.ps1
+.\native~\windows-vst-host\build-x64\bin\Release\VstHostSmokeTest.exe
 ```
 
 ```bash
 # macOS
-./native/macos-vst-host/Build.sh
-./native/macos-vst-host/build/bin/VstHostSmokeTest
+./native~/macos-vst-host/Build.sh
+./native~/macos-vst-host/build/bin/VstHostSmokeTest
 # optional explicit folder:
-VSTHOST_SMOKE_FOLDER="$HOME/Library/Audio/Plug-Ins/VST3" ./native/macos-vst-host/build/bin/VstHostSmokeTest
+VSTHOST_SMOKE_FOLDER="$HOME/Library/Audio/Plug-Ins/VST3" ./native~/macos-vst-host/build/bin/VstHostSmokeTest
 ```
 
 Expects AGain / `again.vst3` (or another free sample) installed locally.
@@ -64,7 +64,7 @@ Expects AGain / `again.vst3` (or another free sample) installed locally.
 Automated (recommended):
 
 ```powershell
-.\native\windows-vst-host\Run-Il2CppVerify.ps1
+.\native~\windows-vst-host\Run-Il2CppVerify.ps1
 ```
 
 Manual: menu **Window → VST3 Host → Build IL2CPP Win64 (Verify)**. Asserts `VstHostNative.dll` is in the player output.
@@ -75,16 +75,16 @@ Manual: menu **Window → VST3 Host → Build IL2CPP Win64 (Verify)**. Asserts `
 2. Menu **Window → VST3 Host → Build Standalone OSX (Verify)** (Mono backend).
 3. Confirm the player contains `VstHostNative.bundle`.
 
-When linking the repo via `file:` / Git, `native/**/build*` outputs may appear — use **Window → VST3 Host → Sanitize Extra Native Plugins**.
+When linking the repo via `file:` / Git, `native~/**/build*` outputs may appear — use **Window → VST3 Host → Sanitize Extra Native Plugins**.
 
 ## MIDI-only build must not contain VST
 
 ```powershell
-.\native\windows-vst-host\Verify-MidiIsolation.ps1 -MidiRepoRoot "<Unity-MIDI-Plugin>"
+.\native~\windows-vst-host\Verify-MidiIsolation.ps1 -MidiRepoRoot "<Unity-MIDI-Plugin>"
 ```
 
 ```bash
-./native/macos-vst-host/Verify-MidiIsolation.sh "<Unity-MIDI-Plugin>"
+./native~/macos-vst-host/Verify-MidiIsolation.sh "<Unity-MIDI-Plugin>"
 ```
 
 Fails if `VstHostNative` (`.dll` / `.bundle` / `.dylib`), VST3 SDK trees, or VST Runtime scripts appear under the MIDI repo `Assets` / `native` / `Packages` (markdown docs are allowed).

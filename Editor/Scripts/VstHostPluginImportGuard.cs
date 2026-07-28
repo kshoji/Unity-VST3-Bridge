@@ -6,7 +6,7 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
 {
     /// <summary>
     /// When the package is linked via <c>file:</c> / Git from the repo root,
-    /// <c>native/**/build*</c> outputs can appear as extra plugins. Keep only
+    /// <c>native~/**/build*</c> outputs can appear as extra plugins. Keep only
     /// package <c>Plugins/Windows/.../VstHostNative.dll</c> and
     /// <c>Plugins/macOS/VstHostNative.bundle</c> enabled.
     /// </summary>

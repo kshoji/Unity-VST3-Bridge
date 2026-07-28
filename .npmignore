@@ -1,4 +1,9 @@
 # Published / registry package contents (native SDK sources stay in the Git repo only).
+#
+# Note: Git URL / file: installs ignore .npmignore. Unity AssetDatabase exclusion
+# for those paths relies on the trailing "~" folder name: native~/
+native~/
+native~/**
 native/
 native/**
 Tests/

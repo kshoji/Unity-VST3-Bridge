@@ -12,7 +12,7 @@ Open `Scenes/VstHostSampleScene`.
 
 - Windows x64
 - At least one `.vst3` under the standard VST3 folders (e.g. `C:\Program Files\Common Files\VST3`)
-- Built `Plugins/Windows/{x86_64,ARM64}/VstHostNative.dll` (`native/windows-vst-host/Build.ps1 -Install`)
+- Built `Plugins/Windows/{x86_64,ARM64}/VstHostNative.dll` (`native~/windows-vst-host/Build.ps1 -Install`)
 
 ## Play mode
 

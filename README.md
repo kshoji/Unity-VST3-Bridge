@@ -27,9 +27,11 @@ No `?path=` suffix is needed — `package.json` is at the repository root.
 - `Samples~/` — importable samples
 - `Documentation~/` — package documentation (usage, verification, plan, macOS portability)
 - `Tests/` — optional package tests
-- `native/` — C++ source for `VstHostNative` (repo only; excluded from registry via `.npmignore`)
-  - `native/windows-vst-host/` — Windows DLL
-  - `native/macos-vst-host/` — macOS bundle (shares SDK submodule under windows tree)
+- `native~/` — C++ source for `VstHostNative` (**Git repo only**)
+  - Trailing `~` = Unity AssetDatabase ignores this folder on Git URL / `file:` installs
+  - Also listed in `.npmignore` for registry publishes
+  - `native~/windows-vst-host/` — Windows DLL
+  - `native~/macos-vst-host/` — macOS bundle (shares SDK submodule under windows tree)
 
 ## Documentation
 
@@ -42,6 +44,7 @@ No `?path=` suffix is needed — `package.json` is at the repository root.
 | [`Documentation~/verification.md`](Documentation~/verification.md) | Manual / IL2CPP / isolation checks |
 | [`Documentation~/limitations.md`](Documentation~/limitations.md) | Known limits |
 | [`Documentation~/macos-portability.md`](Documentation~/macos-portability.md) | Windows-only surface + Phase M prep |
+| [`Documentation~/package-excludes.md`](Documentation~/package-excludes.md) | Why `native~/` (Git/file: vs `.npmignore`) |
 | [`NOTICE.md`](NOTICE.md) | Trademark, VST3 SDK license, distribution boundary |
 | [`Documentation~/vst3-native-host-plan.md`](Documentation~/vst3-native-host-plan.md) | Design plan (canonical) |
 
@@ -89,24 +92,24 @@ Audio returns via Path B: native `process` called from `OnAudioFilterRead`.
 
 ## Native build / VST3 SDK
 
-Rebuilders need the SDK submodule (under `native/windows-vst-host/vst3sdk`) plus
+Rebuilders need the SDK submodule (under `native~/windows-vst-host/vst3sdk`) plus
 platform toolchains:
 
 ```powershell
 # Windows
-git submodule update --init --recursive -- native/windows-vst-host/vst3sdk
-cd native/windows-vst-host
+git submodule update --init --recursive -- native~/windows-vst-host/vst3sdk
+cd native~/windows-vst-host
 .\Build.ps1 -Install
 ```
 
 ```bash
 # macOS
-git submodule update --init --recursive -- native/windows-vst-host/vst3sdk
-cd native/macos-vst-host
+git submodule update --init --recursive -- native~/windows-vst-host/vst3sdk
+cd native~/macos-vst-host
 ./Build.sh --Install
 ```
 
-See `native/windows-vst-host/README.md`, `native/macos-vst-host/README.md`, and
+See `native~/windows-vst-host/README.md`, `native~/macos-vst-host/README.md`, and
 `NOTICE.md`. Prebuilt binaries under `Plugins/` are enough for normal UPM use.
 
 ## Debug tracing (load / lifecycle)
