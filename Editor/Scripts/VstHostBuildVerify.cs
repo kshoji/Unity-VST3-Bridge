@@ -248,6 +248,8 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
             var editorOk = importer.GetCompatibleWithEditor();
             var win64Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows64);
             var win32Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows);
+            var osxOk = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneOSX);
+            var arm64Ok = IsWindowsArm64Compatible(importer);
             var anyOk = importer.GetCompatibleWithAnyPlatform();
 
             if (anyOk)
@@ -262,9 +264,9 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
                 return false;
             }
 
-            if (win32Ok)
+            if (win32Ok || osxOk || arm64Ok)
             {
-                message = $"{dllAssetPath}: StandaloneWindows (x86) should stay disabled.";
+                message = $"{dllAssetPath}: disable Win32 / OSX / Windows ARM64 (x86_64 Editor+Win64 only).";
                 return false;
             }
 
@@ -285,6 +287,8 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
             var editorOk = importer.GetCompatibleWithEditor();
             var win64Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows64);
             var win32Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows);
+            var osxOk = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneOSX);
+            var arm64Ok = IsWindowsArm64Compatible(importer);
 
             if (anyOk)
             {
@@ -292,9 +296,16 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
                 return false;
             }
 
-            if (editorOk || win64Ok || win32Ok)
+            if (!arm64Ok)
             {
-                message = $"{dllAssetPath}: disable Editor/Win64/Win32 (Standalone Windows ARM64 only; editorOk={editorOk}, win64Ok={win64Ok}).";
+                message = $"{dllAssetPath}: enable Standalone Windows ARM64.";
+                return false;
+            }
+
+            if (editorOk || win64Ok || win32Ok || osxOk)
+            {
+                message =
+                    $"{dllAssetPath}: disable Editor/Win64/Win32/OSX (Standalone Windows ARM64 only; editorOk={editorOk}, win64Ok={win64Ok}).";
                 return false;
             }
 
@@ -316,6 +327,7 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
             var osxOk = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneOSX);
             var win64Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows64);
             var win32Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows);
+            var arm64Ok = IsWindowsArm64Compatible(importer);
 
             if (anyOk)
             {
@@ -329,7 +341,7 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
                 return false;
             }
 
-            if (win64Ok || win32Ok)
+            if (win64Ok || win32Ok || arm64Ok)
             {
                 message = $"{bundleAssetPath}: Windows platforms must stay disabled.";
                 return false;
@@ -337,6 +349,28 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
 
             message = $"{bundleAssetPath}: platforms OK (Editor OSX + OSXUniversal).";
             return true;
+        }
+
+        private static bool IsWindowsArm64Compatible(PluginImporter importer)
+        {
+            try
+            {
+                if (importer.GetCompatibleWithPlatform("WindowsStandaloneArm64"))
+                    return true;
+            }
+            catch
+            {
+                // Older editors without the platform id — try alternate name.
+            }
+
+            try
+            {
+                return importer.GetCompatibleWithPlatform("StandaloneWindowsArm64");
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static string FindFirstEnabledScene()

@@ -1,4 +1,5 @@
-# Keep directory in git; allow committed DLLs.
+# Keep directory in git; allow committed DLLs and PluginImporter metas.
 *
 !.gitignore
 !*.dll
+!*.meta

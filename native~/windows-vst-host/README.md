@@ -22,8 +22,11 @@ consumed by Unity via P/Invoke (`DllImport("VstHostNative")`).
 
 | Arch | Output | Unity Plugin settings |
 |------|--------|------------------------|
-| x64 | `Plugins/Windows/x86_64/VstHostNative.dll` | Editor (Windows x86_64) + Standalone Win64 |
-| ARM64 | `Plugins/Windows/ARM64/VstHostNative.dll` | Standalone Windows ARM64 only |
+| x64 | `Plugins/Windows/x86_64/VstHostNative.dll` (+ `.meta`) | Editor (Windows x86_64) + Standalone Win64 |
+| ARM64 | `Plugins/Windows/ARM64/VstHostNative.dll` (+ `.meta`) | Standalone Windows ARM64 only |
+
+PluginImporter `.meta` files are committed next to each DLL (same policy as
+`Plugins/macOS/VstHostNative.bundle.meta`). After `-Install`, do not delete them.
 
 
 ## Exported Functions
@@ -32,7 +35,7 @@ consumed by Unity via P/Invoke (`DllImport("VstHostNative")`).
 |----------|-------------|
 | `VstHost_Initialize` | Set sample rate and block size; install host context |
 | `VstHost_Terminate` | Release all instances and shut down |
-| `VstHost_ScanFolder` | Enumerate VST3 plugins (null/empty = Windows standard folders) |
+| `VstHost_ScanFolder` | Enumerate VST3 plugins (null/empty = SDK standard folders) |
 | `VstHost_Load` | Load a .vst3 and create an instance (optional class UID) |
 | `VstHost_Unload` | Destroy a plugin instance (fixed teardown order) |
 | `VstHost_SendMidi1` | Enqueue MIDI 1.0 short message (lock-free SPSC queue) |
@@ -45,8 +48,8 @@ consumed by Unity via P/Invoke (`DllImport("VstHostNative")`).
 ## Smoke test
 
 ```powershell
-cmake --build build --config Release
-.\build\bin\Release\VstHostSmokeTest.exe
+.\Build.ps1 -Platform x64
+.\build-x64\bin\Release\VstHostSmokeTest.exe
 ```
 
 Expects SDK sample `again.vst3` under the platform default VST3 folder, or set

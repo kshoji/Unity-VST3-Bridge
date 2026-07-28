@@ -1,6 +1,6 @@
 # VST3 Host Sample
 
-Windows x64 Editor / Standalone sample for **Unity Plugin Host for VST3**.
+Editor / Standalone sample for **Unity Plugin Host for VST3** (Windows + macOS).
 
 ## Import
 
@@ -10,9 +10,13 @@ Open `Scenes/VstHostSampleScene`.
 
 ## Requirements
 
-- Windows x64
-- At least one `.vst3` under the standard VST3 folders (e.g. `C:\Program Files\Common Files\VST3`)
-- Built `Plugins/Windows/{x86_64,ARM64}/VstHostNative.dll` (`native~/windows-vst-host/Build.ps1 -Install`)
+- Windows (x64 Editor / Win64 or Windows ARM64 player) **or** macOS (Editor OSX / OSXUniversal)
+- At least one `.vst3` under the OS-standard VST3 folders
+  - Windows: e.g. `C:\Program Files\Common Files\VST3`
+  - macOS: e.g. `~/Library/Audio/Plug-Ins/VST3`
+- Native bridge already under `Plugins/` (rebuild if needed):
+  - Windows: `native~/windows-vst-host/Build.ps1 -Install`
+  - macOS: `native~/macos-vst-host/Build.sh --Install`
 
 ## Play mode
 

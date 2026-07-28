@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+- Commit Windows `VstHostNative.dll.meta` (x86_64 + ARM64) and stop ignoring
+  them in `Plugins/Windows/**/.gitignore` (macOS already tracked `.meta`).
+- `VstHostBuildVerify` now requires Windows ARM64 to be explicitly enabled and
+  rejects cross-OS platform flags on each plugin binary.
+- Sample README / plan “現状” updated for Windows + macOS (no longer Windows-only).
+
 ### Added
 - **Phase M (macOS):** `native~/macos-vst-host/` (CMake + `Build.sh`), Universal
   `Plugins/macOS/VstHostNative.bundle`, macOS scan paths, Editor OSX verify /

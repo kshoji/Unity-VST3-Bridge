@@ -29,8 +29,10 @@ cd native~/macos-vst-host
 | Standalone OSXUniversal | **Yes**, `CPU: AnyCPU` |
 | Standalone Win / Win64 / Windows ARM64 / Linux / Android / iOS | **No** |
 
-After first import on macOS Editor, confirm Inspector matches the table; commit
-Unity’s rewritten `.meta` if it differs slightly by Editor version.
+After first import, confirm Inspector matches the table; commit Unity’s
+rewritten `.meta` if it differs slightly by Editor version. Windows DLL
+`.meta` files under `Plugins/Windows/{x86_64,ARM64}/` follow the same
+“commit PluginImporter” rule.
 
 Nested `Contents/*.meta` files may appear after Unity import — commit them if
 the Editor creates them (same pattern as Unity MIDI Plugin’s `MIDIPlugin.bundle`).
