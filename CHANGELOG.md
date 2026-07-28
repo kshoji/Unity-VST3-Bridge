@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## 1.0.0
 
 ### Fixed
 - Commit Windows `VstHostNative.dll.meta` (x86_64 + ARM64) and stop ignoring
