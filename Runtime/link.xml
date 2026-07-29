@@ -1,0 +1,4 @@
+<linker>
+  <!-- Preserve P/Invoke surface for IL2CPP Standalone Windows. -->
+  <assembly fullname="jp.kshoji.unity.vst3nativehost.Runtime" preserve="all" />
+</linker>

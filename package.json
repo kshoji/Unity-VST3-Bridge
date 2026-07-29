@@ -12,5 +12,12 @@
     "version": "1.0.0",
     "unity": "2022.3",
     "description": "A Unity package for hosting VST3 instruments and effects through a native bridge, with optional MIDI plugin integration.",
-    "dependencies": {}
+    "dependencies": {},
+    "samples": [
+        {
+            "displayName": "VST3 Host Sample",
+            "description": "Scan/load VST3 plugins, play manual notes, and optionally wire Unity MIDI Plugin (Windows + macOS).",
+            "path": "Samples~/VstHostSample"
+        }
+    ]
 }

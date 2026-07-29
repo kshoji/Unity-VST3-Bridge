@@ -16,10 +16,23 @@ Thumbs.db
 [Bb]uilds/
 *.log
 
-# Native build output (committed DLLs go in Plugins/)
+# Native build output (committed DLLs/bundles go in Plugins/)
+# Folder is native~ so Unity AssetDatabase ignores it on Git/file: installs.
+native~/**/build/
+native~/**/build-x64/
+native~/**/build-arm64/
+native~/**/out/
+# Legacy path (pre-rename) — keep ignoring if a stray folder reappears
 native/**/build/
+native/**/build-x64/
+native/**/build-arm64/
 native/**/out/
 *.pdb
+
+# Never commit Unity .meta under native sources (folder should be native~)
+native/**/*.meta
+native~/**/*.meta
+native.meta
 
 # Unity auto-generated
 *.csproj

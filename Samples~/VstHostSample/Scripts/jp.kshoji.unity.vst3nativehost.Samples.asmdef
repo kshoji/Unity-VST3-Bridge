@@ -1,9 +1,12 @@
 {
-    "name": "jp.kshoji.unity.vst3nativehost.Runtime",
-    "references": [],
+    "name": "jp.kshoji.unity.vst3nativehost.Samples",
+    "rootNamespace": "jp.kshoji.unity.vst3nativehost.sample",
+    "references": [
+        "jp.kshoji.unity.vst3nativehost.Runtime"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
-    "allowUnsafeCode": true,
+    "allowUnsafeCode": false,
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,

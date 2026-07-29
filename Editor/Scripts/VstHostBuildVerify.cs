@@ -1,0 +1,390 @@
+using System;
+using System.IO;
+using System.Linq;
+using UnityEditor;
+using UnityEditor.Build;
+using UnityEditor.Build.Reporting;
+using UnityEngine;
+
+namespace jp.kshoji.unity.vst3nativehost.Editor
+{
+    /// <summary>
+    /// Plugin platform flags + optional Standalone verify builds (Win64 IL2CPP / OSX).
+    /// Batchmode Win64: -executeMethod jp.kshoji.unity.vst3nativehost.Editor.VstHostBuildVerify.BuildIl2CppWin64
+    /// Batchmode OSX: -executeMethod jp.kshoji.unity.vst3nativehost.Editor.VstHostBuildVerify.BuildStandaloneOSX
+    /// </summary>
+    public static class VstHostBuildVerify
+    {
+        private const string DllRelativeX64 = "Plugins/Windows/x86_64/VstHostNative.dll";
+        private const string DllRelativeArm64 = "Plugins/Windows/ARM64/VstHostNative.dll";
+        private const string BundleRelativeMac = "Plugins/macOS/VstHostNative.bundle";
+
+        [MenuItem("Window/VST3 Host/Verify Plugin Platforms")]
+        public static void VerifyPluginPlatformsMenu()
+        {
+            if (VerifyPluginPlatforms(out var message))
+                Debug.Log($"[VstHost] {message}");
+            else
+                Debug.LogError($"[VstHost] {message}");
+        }
+
+        [MenuItem("Window/VST3 Host/Build IL2CPP Win64 (Verify)")]
+        public static void BuildIl2CppWin64Menu()
+        {
+            var code = BuildIl2CppWin64Internal();
+            if (code != 0)
+                throw new BuildFailedException($"IL2CPP Win64 verify build failed with code {code}");
+        }
+
+        [MenuItem("Window/VST3 Host/Build Standalone OSX (Verify)")]
+        public static void BuildStandaloneOSXMenu()
+        {
+            var code = BuildStandaloneOSXInternal();
+            if (code != 0)
+                throw new BuildFailedException($"Standalone OSX verify build failed with code {code}");
+        }
+
+        public static void BuildIl2CppWin64()
+        {
+            var code = BuildIl2CppWin64Internal();
+            EditorApplication.Exit(code);
+        }
+
+        public static void BuildStandaloneOSX()
+        {
+            var code = BuildStandaloneOSXInternal();
+            EditorApplication.Exit(code);
+        }
+
+        private static int BuildIl2CppWin64Internal()
+        {
+            if (!VerifyPluginPlatforms(out var pluginMsg))
+            {
+                Debug.LogError($"[VstHost] {pluginMsg}");
+                return 2;
+            }
+
+            Debug.Log($"[VstHost] {pluginMsg}");
+
+            EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Standalone, BuildTarget.StandaloneWindows64);
+            PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone, ScriptingImplementation.IL2CPP);
+            PlayerSettings.SetArchitecture(NamedBuildTarget.Standalone, 2); // x86_64
+
+            var scene = FindFirstEnabledScene();
+            if (string.IsNullOrEmpty(scene))
+            {
+                Debug.LogError("[VstHost] No enabled scene in Build Settings.");
+                return 3;
+            }
+
+            EditorBuildSettings.scenes = new[]
+            {
+                new EditorBuildSettingsScene(scene, true)
+            };
+
+            var outDir = Path.Combine(Directory.GetParent(Application.dataPath)!.FullName, "Builds", "Win64-IL2CPP-Verify");
+            Directory.CreateDirectory(outDir);
+            var exe = Path.Combine(outDir, "VstHostVerify.exe");
+
+            var options = new BuildPlayerOptions
+            {
+                scenes = new[] { scene },
+                locationPathName = exe,
+                target = BuildTarget.StandaloneWindows64,
+                options = BuildOptions.None
+            };
+
+            var report = BuildPipeline.BuildPlayer(options);
+            if (report.summary.result != BuildResult.Succeeded)
+            {
+                Debug.LogError($"[VstHost] Build failed: {report.summary.result}");
+                return 4;
+            }
+
+            var dllHits = Directory.GetFiles(outDir, "VstHostNative.dll", SearchOption.AllDirectories);
+            if (dllHits.Length == 0)
+            {
+                Debug.LogError("[VstHost] Built player is missing VstHostNative.dll");
+                return 5;
+            }
+
+            Debug.Log($"[VstHost] IL2CPP Win64 verify OK. DLL: {dllHits[0]}");
+            return 0;
+        }
+
+        private static int BuildStandaloneOSXInternal()
+        {
+            if (!VerifyPluginPlatforms(out var pluginMsg))
+            {
+                Debug.LogError($"[VstHost] {pluginMsg}");
+                return 2;
+            }
+
+            Debug.Log($"[VstHost] {pluginMsg}");
+
+            EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Standalone, BuildTarget.StandaloneOSX);
+            // Mono is fine for verify; IL2CPP requires matching toolchain on the Mac.
+            PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone, ScriptingImplementation.Mono2x);
+
+            var scene = FindFirstEnabledScene();
+            if (string.IsNullOrEmpty(scene))
+            {
+                Debug.LogError("[VstHost] No enabled scene in Build Settings.");
+                return 3;
+            }
+
+            EditorBuildSettings.scenes = new[]
+            {
+                new EditorBuildSettingsScene(scene, true)
+            };
+
+            var outDir = Path.Combine(Directory.GetParent(Application.dataPath)!.FullName, "Builds", "OSX-Verify");
+            Directory.CreateDirectory(outDir);
+            var app = Path.Combine(outDir, "VstHostVerify.app");
+
+            var options = new BuildPlayerOptions
+            {
+                scenes = new[] { scene },
+                locationPathName = app,
+                target = BuildTarget.StandaloneOSX,
+                options = BuildOptions.None
+            };
+
+            var report = BuildPipeline.BuildPlayer(options);
+            if (report.summary.result != BuildResult.Succeeded)
+            {
+                Debug.LogError($"[VstHost] Build failed: {report.summary.result}");
+                return 4;
+            }
+
+            var bundleHits = Directory.GetDirectories(outDir, "VstHostNative.bundle", SearchOption.AllDirectories);
+            if (bundleHits.Length == 0)
+            {
+                Debug.LogError("[VstHost] Built player is missing VstHostNative.bundle");
+                return 5;
+            }
+
+            Debug.Log($"[VstHost] Standalone OSX verify OK. Bundle: {bundleHits[0]}");
+            return 0;
+        }
+
+        public static bool VerifyPluginPlatforms(out string message)
+        {
+            if (!TryResolvePluginAssetPath(DllRelativeX64, out var x64Path))
+            {
+                message = $"Could not locate {DllRelativeX64} in the package.";
+                return false;
+            }
+
+            if (!VerifyX64Importer(x64Path, out message))
+                return false;
+
+            if (!TryResolvePluginAssetPath(DllRelativeArm64, out var arm64Path))
+            {
+                message = $"Could not locate {DllRelativeArm64} in the package.";
+                return false;
+            }
+
+            if (!VerifyArm64Importer(arm64Path, out message))
+                return false;
+
+            if (!TryResolvePluginAssetPath(BundleRelativeMac, out var macPath))
+            {
+                message = $"Could not locate {BundleRelativeMac} in the package.";
+                return false;
+            }
+
+            if (!VerifyMacImporter(macPath, out message))
+                return false;
+
+            message =
+                $"{x64Path}: Editor + Win64 OK; {arm64Path}: Windows ARM64 OK; {macPath}: Editor OSX + OSXUniversal OK.";
+            return true;
+        }
+
+        private static bool TryResolvePluginAssetPath(string relative, out string assetPath)
+        {
+            assetPath = null;
+            var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssembly(
+                typeof(VstHostManager).Assembly);
+
+            if (packageInfo != null)
+            {
+                var candidate = Path.Combine(packageInfo.assetPath, relative).Replace('\\', '/');
+                var full = Path.GetFullPath(candidate);
+                if (File.Exists(full) || Directory.Exists(full))
+                {
+                    assetPath = candidate;
+                    return true;
+                }
+            }
+
+            var needle = relative.Replace('\\', '/');
+            var guids = AssetDatabase.FindAssets("VstHostNative");
+            foreach (var guid in guids)
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                var normalized = path.Replace('\\', '/');
+                if (normalized.EndsWith(needle, StringComparison.OrdinalIgnoreCase)
+                    || normalized.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    assetPath = path;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool VerifyX64Importer(string dllAssetPath, out string message)
+        {
+            var importer = AssetImporter.GetAtPath(dllAssetPath) as PluginImporter;
+            if (importer == null)
+            {
+                message = $"PluginImporter missing for {dllAssetPath}";
+                return false;
+            }
+
+            var editorOk = importer.GetCompatibleWithEditor();
+            var win64Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows64);
+            var win32Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows);
+            var osxOk = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneOSX);
+            var arm64Ok = IsWindowsArm64Compatible(importer);
+            var anyOk = importer.GetCompatibleWithAnyPlatform();
+
+            if (anyOk)
+            {
+                message = $"{dllAssetPath}: must not be Compatible With Any Platform (keep Win64/Editor only).";
+                return false;
+            }
+
+            if (!editorOk || !win64Ok)
+            {
+                message = $"{dllAssetPath}: enable Editor + StandaloneWindows64 (editorOk={editorOk}, win64Ok={win64Ok}).";
+                return false;
+            }
+
+            if (win32Ok || osxOk || arm64Ok)
+            {
+                message = $"{dllAssetPath}: disable Win32 / OSX / Windows ARM64 (x86_64 Editor+Win64 only).";
+                return false;
+            }
+
+            message = $"{dllAssetPath}: platforms OK (Editor + Win64 only).";
+            return true;
+        }
+
+        private static bool VerifyArm64Importer(string dllAssetPath, out string message)
+        {
+            var importer = AssetImporter.GetAtPath(dllAssetPath) as PluginImporter;
+            if (importer == null)
+            {
+                message = $"PluginImporter missing for {dllAssetPath}";
+                return false;
+            }
+
+            var anyOk = importer.GetCompatibleWithAnyPlatform();
+            var editorOk = importer.GetCompatibleWithEditor();
+            var win64Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows64);
+            var win32Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows);
+            var osxOk = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneOSX);
+            var arm64Ok = IsWindowsArm64Compatible(importer);
+
+            if (anyOk)
+            {
+                message = $"{dllAssetPath}: must not be Compatible With Any Platform (Windows ARM64 only).";
+                return false;
+            }
+
+            if (!arm64Ok)
+            {
+                message = $"{dllAssetPath}: enable Standalone Windows ARM64.";
+                return false;
+            }
+
+            if (editorOk || win64Ok || win32Ok || osxOk)
+            {
+                message =
+                    $"{dllAssetPath}: disable Editor/Win64/Win32/OSX (Standalone Windows ARM64 only; editorOk={editorOk}, win64Ok={win64Ok}).";
+                return false;
+            }
+
+            message = $"{dllAssetPath}: platforms OK (Windows ARM64 only).";
+            return true;
+        }
+
+        private static bool VerifyMacImporter(string bundleAssetPath, out string message)
+        {
+            var importer = AssetImporter.GetAtPath(bundleAssetPath) as PluginImporter;
+            if (importer == null)
+            {
+                message = $"PluginImporter missing for {bundleAssetPath}";
+                return false;
+            }
+
+            var anyOk = importer.GetCompatibleWithAnyPlatform();
+            var editorOk = importer.GetCompatibleWithEditor();
+            var osxOk = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneOSX);
+            var win64Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows64);
+            var win32Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows);
+            var arm64Ok = IsWindowsArm64Compatible(importer);
+
+            if (anyOk)
+            {
+                message = $"{bundleAssetPath}: must not be Compatible With Any Platform (OSX only).";
+                return false;
+            }
+
+            if (!editorOk || !osxOk)
+            {
+                message = $"{bundleAssetPath}: enable Editor (OS=OSX) + StandaloneOSX (editorOk={editorOk}, osxOk={osxOk}).";
+                return false;
+            }
+
+            if (win64Ok || win32Ok || arm64Ok)
+            {
+                message = $"{bundleAssetPath}: Windows platforms must stay disabled.";
+                return false;
+            }
+
+            message = $"{bundleAssetPath}: platforms OK (Editor OSX + OSXUniversal).";
+            return true;
+        }
+
+        private static bool IsWindowsArm64Compatible(PluginImporter importer)
+        {
+            try
+            {
+                if (importer.GetCompatibleWithPlatform("WindowsStandaloneArm64"))
+                    return true;
+            }
+            catch
+            {
+                // Older editors without the platform id — try alternate name.
+            }
+
+            try
+            {
+                return importer.GetCompatibleWithPlatform("StandaloneWindowsArm64");
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string FindFirstEnabledScene()
+        {
+            var scenes = EditorBuildSettings.scenes;
+            var enabled = scenes?.FirstOrDefault(s =>
+                s.enabled && !string.IsNullOrEmpty(s.path) && s.path.EndsWith(".unity", StringComparison.OrdinalIgnoreCase));
+            if (enabled != null)
+                return enabled.path;
+
+            var guids = AssetDatabase.FindAssets("t:Scene");
+            return guids
+                .Select(AssetDatabase.GUIDToAssetPath)
+                .FirstOrDefault(p => p.EndsWith(".unity", StringComparison.OrdinalIgnoreCase));
+        }
+    }
+}
