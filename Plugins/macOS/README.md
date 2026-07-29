@@ -40,4 +40,4 @@ the Editor creates them (same pattern as Unity MIDI Plugin’s `MIDIPlugin.bundl
 ## Related
 
 - Native sources: `native~/macos-vst-host/`
-- Package docs: `Documentation~/usage.md`, `Documentation~/package-excludes.md`
+- Package docs: [Documentation~/usage.md](../../Documentation~/usage.md), [Documentation~/package-excludes.md](../../Documentation~/package-excludes.md)

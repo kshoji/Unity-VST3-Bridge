@@ -6,8 +6,8 @@ using UnityEngine;
 namespace jp.kshoji.unity.vst3nativehost.sample
 {
     /// <summary>
-    /// Verification A: VST-only (scan / load / manual notes / audio).
-    /// Verification B: when Unity MIDI Plugin + <c>FEATURE_MIDI_PLUGIN</c> are available,
+    /// Sample controller: VST-only (scan / load / manual notes / audio).
+    /// When Unity MIDI Plugin + <c>FEATURE_MIDI_PLUGIN</c> are available,
     /// optionally attaches <c>VstHostMidiAdapter</c> via reflection (no hard asmdef dependency).
     /// </summary>
     public sealed class VstHostSampleController : MonoBehaviour
@@ -241,8 +241,8 @@ namespace jp.kshoji.unity.vst3nativehost.sample
             GUILayout.Label("Unity Plugin Host for VST3 — Sample");
             GUILayout.Label(status);
             GUILayout.Label(midiAvailable
-                ? "MIDI assembly detected (Verification B ready)"
-                : "MIDI assembly not present (Verification A)");
+                ? "MIDI assembly detected (MIDI + VST ready)"
+                : "MIDI assembly not present (VST only)");
 
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Rescan"))

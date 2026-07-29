@@ -73,7 +73,7 @@ $manifest = Join-Path $MidiRepoRoot "Packages\manifest.json"
 if (Test-Path $manifest) {
     $text = Get-Content $manifest -Raw
     if ($text -match "jp\.kshoji\.unity\.vst3nativehost") {
-        Write-Host "NOTE: manifest references VST package (OK for local Verification B; remove for MIDI-only release)." -ForegroundColor Yellow
+        Write-Host "NOTE: manifest references VST package (OK for local MIDI+VST verify; remove for MIDI-only release)." -ForegroundColor Yellow
     }
 }
 

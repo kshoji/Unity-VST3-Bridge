@@ -123,7 +123,7 @@ namespace jp.kshoji.unity.vst3nativehost
 
         /// <summary>
         /// Initialize using <see cref="AudioSettings"/> sample rate and DSP buffer size.
-        /// Prefer this for Path B (<c>OnAudioFilterRead</c>).
+        /// Prefer this when using <c>OnAudioFilterRead</c> (see <c>VstHostAudioFilter</c>).
         /// </summary>
         public bool InitializeFromAudioSettings(int blockSizeHeadroom = 2)
         {

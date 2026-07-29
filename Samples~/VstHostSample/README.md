@@ -22,7 +22,7 @@ Open `Scenes/VstHostSampleScene`.
 
 1. Enter Play Mode.
 2. The sample scans VST3 folders and tries to load `mda DX10` (or another Instrument).
-3. Press **Note On** / **Note Off**, or use a MIDI device when Verification B is set up.
+3. Press **Note On** / **Note Off**, or use a MIDI device when MIDI + VST setup is ready.
 4. Use the parameter window to change gain / timbre.
 
-Full verification matrix: `Documentation~/verification.md`.
+Full verification matrix: [Documentation~/verification.md](../../Documentation~/verification.md).

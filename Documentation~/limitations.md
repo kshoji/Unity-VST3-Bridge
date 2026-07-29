@@ -14,10 +14,10 @@ intentional product boundaries, not temporary bugs.
 | Redistribution | Third-party `.vst3` binaries are **not** bundled. Users install plugins on their own machines. |
 | MIDI package | Unity MIDI Plugin does **not** include this host, `VstHostNative` (`.dll` / `.bundle`), or the VST3 SDK. |
 | Process model | In-process host only. Separate-process isolation / IPC is out of scope for V1. |
-| Audio path | Path B only (`OnAudioFilterRead` → native `process`). Native Audio Plugin Mixer path and ASIO/WASAPI bypass are not implemented. |
-| Latency / threading | Buffer size and latency follow Unity DSP settings; realtime rules are documented in `audio-path.md`. |
+| Audio path | `OnAudioFilterRead` → native `process` only. Native Audio Plugin Mixer path and ASIO/WASAPI bypass are not implemented. |
+| Latency / threading | Buffer size and latency follow Unity DSP settings; realtime rules are documented in [audio-path.md](audio-path.md). |
 
 ## Trademark reminder
 
 VST® is a registered trademark of Steinberg Media Technologies GmbH.
-See `NOTICE.md` for SDK and trademark guidance.
+See [NOTICE.md](../NOTICE.md) for SDK and trademark guidance.

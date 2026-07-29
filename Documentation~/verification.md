@@ -8,7 +8,7 @@
   - **macOS:** `./native~/macos-vst-host/Build.sh --Install`
 - Local `.vst3` plugins (do **not** redistribute third-party plugins)
 
-## Verification A — VST only (manual notes)
+## VST only (manual notes)
 
 1. Create an empty Unity project **or** use Package Manager Git URL:
    `https://github.com/kshoji/Unity-VST3-Bridge.git`
@@ -23,7 +23,7 @@ For load/unload crash investigation, add scripting define **`VSTHOST_DEBUG`**
 (Player Settings) to restore `[VstHost] CreateInstance` / `DestroyInstance` traces.
 Leave it unset for normal use.
 
-## Verification B — MIDI + VST (same Unity project)
+## MIDI + VST (same Unity project)
 
 1. Open a Unity project that already contains Unity MIDI Plugin.
 2. Add the VST package as a local package in `Packages/manifest.json`:

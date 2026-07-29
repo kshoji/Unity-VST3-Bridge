@@ -13,7 +13,7 @@ host.NoteOn(id, channel: 0, note: 60, velocity: 100);
 host.NoteOff(id, channel: 0, note: 60);
 ```
 
-See also `audio-path.md`.
+See also [audio-path.md](audio-path.md).
 
 ## With MIDI Plugin
 
@@ -27,4 +27,4 @@ MIDI 2.0 channel voice is down-converted to MIDI 1.0. SysEx and per-note message
 
 Do not put VST routing into MIDI core `midi2Plugins`; keep routing in this package.
 
-Also see `usage.md` for scan paths and install overview.
+Also see [usage.md](usage.md) for scan paths and install overview.

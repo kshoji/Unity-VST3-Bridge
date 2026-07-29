@@ -5,7 +5,7 @@ using UnityEngine;
 namespace jp.kshoji.unity.vst3nativehost
 {
     /// <summary>
-    /// Path B: call native <c>VstHost_Process</c> from Unity's audio thread
+    /// Call native <c>VstHost_Process</c> from Unity's audio thread
     /// (<see cref="OnAudioFilterRead"/>) and write planar stereo into the filter buffer.
     /// Attach to a GameObject with an <see cref="AudioSource"/> (looping silence clip).
     /// Do not call Unity APIs from <see cref="OnAudioFilterRead"/>.

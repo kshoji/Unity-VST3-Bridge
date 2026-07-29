@@ -30,7 +30,7 @@ chmod +x ./Build.sh
 |--------|------------------------|
 | `Plugins/macOS/VstHostNative.bundle` | Editor (OS = OSX) + Standalone OSXUniversal |
 
-`.meta` policy: see `Plugins/macOS/README.md`.
+`.meta` policy: see [Plugins/macOS/README.md](../../Plugins/macOS/README.md).
 
 ## Smoke test
 
@@ -52,4 +52,4 @@ Expects a free/SDK sample such as `again.vst3` / AGain on the machine (not redis
 - C ABI / export names unchanged (`visibility("default")` in `VstHostNative.h`)
 
 VST® is a registered trademark of Steinberg Media Technologies GmbH.
-See repository root `NOTICE.md`.
+See repository root [NOTICE.md](../../NOTICE.md).

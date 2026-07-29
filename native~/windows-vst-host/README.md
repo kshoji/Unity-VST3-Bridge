@@ -69,4 +69,4 @@ required for building. `vstgui4`, `doc`, and `tutorials` are not needed.
 
 VST® is a registered trademark of Steinberg Media Technologies GmbH.
 
-License and acquisition details for the SDK: repository root `NOTICE.md`.
+License and acquisition details for the SDK: repository root [NOTICE.md](../../NOTICE.md).

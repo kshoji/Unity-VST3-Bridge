@@ -1,4 +1,4 @@
-# Audio path (B)
+# Audio path
 
 Unity audio thread → `VstHostAudioFilter.OnAudioFilterRead` → `VstHost_Process` → VST3 `IAudioProcessor::process`.
 

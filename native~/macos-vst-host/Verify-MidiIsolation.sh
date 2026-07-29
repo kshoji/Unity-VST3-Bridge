@@ -68,7 +68,7 @@ done
 
 manifest="${MIDI_ROOT}/Packages/manifest.json"
 if [[ -f "${manifest}" ]] && grep -q 'jp\.kshoji\.unity\.vst3nativehost' "${manifest}"; then
-  echo "NOTE: manifest references VST package (OK for local Verification B; remove for MIDI-only release)."
+  echo "NOTE: manifest references VST package (OK for local MIDI+VST verify; remove for MIDI-only release)."
 fi
 
 if [[ "${failures}" -eq 0 ]]; then

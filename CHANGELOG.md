@@ -14,8 +14,8 @@
   `Plugins/macOS/VstHostNative.bundle`, macOS scan paths, Editor OSX verify /
   isolation helpers, documentation updates.
 - Renamed `native/` → **`native~/`** so Git URL / `file:` installs do not import
-  SDK sources (`.npmignore` alone does not apply). See `Documentation~/package-excludes.md`.
+  SDK sources (`.npmignore` alone does not apply). See [Documentation~/package-excludes.md](Documentation~/package-excludes.md).
 - Initial package layout (Runtime, Editor, Tests, Samples~, Documentation~, Plugins).
-- Docs: `NOTICE.md` SDK/trademark details, `Documentation~/usage.md`,
-  `Documentation~/limitations.md`.
+- Docs: [NOTICE.md](NOTICE.md) SDK/trademark details, [Documentation~/usage.md](Documentation~/usage.md),
+  [Documentation~/limitations.md](Documentation~/limitations.md).
 - `Plugins/macOS/` scaffold.

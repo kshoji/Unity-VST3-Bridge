@@ -60,8 +60,8 @@ filter.Mode = VstHostAudioFilter.ProcessMode.Instrument;
 host.NoteOn(id, channel: 0, note: 60, velocity: 100);
 ```
 
-Audio path: native `process` from `OnAudioFilterRead` (Path B). Details:
-`audio-path.md`.
+Audio path: native `process` from `OnAudioFilterRead`. Details:
+[audio-path.md](audio-path.md).
 
 ## Optional MIDI Plugin integration
 
@@ -74,28 +74,28 @@ MIDI is **optional**. This package compiles and runs without Unity MIDI Plugin.
 4. Initialize MIDI as usual (`MidiManager.InitializeMidi` / `InitializeMidi2`).
 
 MIDI 2.0 channel voice is down-converted to MIDI 1.0. SysEx / per-note are
-skipped. Full steps: `midi-integration.md` and Verification B in `verification.md`.
+skipped. Full steps: [midi-integration.md](midi-integration.md) and the MIDI + VST section in [verification.md](verification.md).
 
 Do **not** register VST routing in MIDI core `midi2Plugins`; keep routing in
 this package.
 
 ## Parameters and state
 
-See `parameters.md`. Simple IMGUI panel: `VstHostParameterPanel`.
+See [parameters.md](parameters.md). Simple IMGUI panel: `VstHostParameterPanel`.
 Plugin-native GUI (`IPlugView`) is not hosted.
 
 ## Samples and verification
 
 - Package Manager → Samples → **VST3 Host Sample**
-- Checklist: `verification.md` (VST-only, MIDI+VST, IL2CPP, MIDI isolation)
+- Checklist: [verification.md](verification.md) (VST-only, MIDI+VST, IL2CPP, MIDI isolation)
 
 ## Related documents
 
 | Doc | Topic |
 |-----|--------|
-| `audio-path.md` | Path B / realtime rules |
-| `midi-integration.md` | Optional MIDI adapter |
-| `parameters.md` | Parameters / presets / state |
-| `limitations.md` | Known limits |
-| `package-excludes.md` | Why `native~/` stays out of UPM installs |
-| `NOTICE.md` (repo root) | Trademark / SDK / distribution |
+| [audio-path.md](audio-path.md) | Audio path / realtime rules |
+| [midi-integration.md](midi-integration.md) | Optional MIDI adapter |
+| [parameters.md](parameters.md) | Parameters / presets / state |
+| [limitations.md](limitations.md) | Known limits |
+| [package-excludes.md](package-excludes.md) | Why `native~/` stays out of UPM installs |
+| [NOTICE.md](../NOTICE.md) (repo root) | Trademark / SDK / distribution |

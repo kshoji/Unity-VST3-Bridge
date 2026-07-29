@@ -45,7 +45,7 @@ cd native~/macos-vst-host
 
 UPM / registry packages **do not** include `native~/` (see `.npmignore`).
 Git URL and `file:` installs also skip AssetDatabase import because the folder
-name ends with `~` (see `Documentation~/package-excludes.md`).
+name ends with `~` (see [Documentation~/package-excludes.md](Documentation~/package-excludes.md)).
 End users who only consume the prebuilt `Plugins/.../VstHostNative`
 (`.dll` / `.bundle`) do not need a local SDK checkout. Rebuilders and
 contributors do.
@@ -55,7 +55,7 @@ contributors do.
 The VST3 SDK used here is distributed by Steinberg under the **MIT License**
 (copyright Steinberg Media Technologies GmbH). Full text:
 
-`native~/windows-vst-host/vst3sdk/LICENSE.txt`
+[native~/windows-vst-host/vst3sdk/LICENSE.txt](native~/windows-vst-host/vst3sdk/LICENSE.txt)
 
 (same MIT terms under `base/`, `pluginterfaces/`, `public.sdk/`, `cmake/`).
 
