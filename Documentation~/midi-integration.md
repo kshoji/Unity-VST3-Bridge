@@ -70,3 +70,11 @@ Virtual device inject → VstHostMidiAdapter
 Enable **Map Program Change To Host Program** on the adapter to call `VstHostManager.SetProgram` when MIDI Program Change arrives (in addition to, or instead of, forwarding MIDI PC via **Forward Program Change**).
 
 Preset assets and the editor browser are documented in [parameters.md](parameters.md).
+
+## Plugin chain and Scriptable Audio
+
+- Multi-plugin serial / parallel mix: [plugin-chain.md](plugin-chain.md) (`VstPluginChain`).
+- DSP-timed MIDI + `VstHostGenerator`: [scriptable-audio.md](scriptable-audio.md).
+
+Assign `VstHostDspMidiOutBridge` to `MidiDspSequenceScheduler.extraTimedMidiOutput` (or the UMP scheduler) so sequence notes flush into the VST process block on the DSP clock.
+

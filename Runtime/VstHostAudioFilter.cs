@@ -26,6 +26,7 @@ namespace jp.kshoji.unity.vst3nativehost
         [SerializeField] private ProcessMode mode = ProcessMode.Instrument;
         [SerializeField] private float outputGain = 1f;
         [SerializeField] private bool autoPlaySilentSource = true;
+        [SerializeField] private bool flushDspMidiQueue = true;
 
         private float[] planarL = Array.Empty<float>();
         private float[] planarR = Array.Empty<float>();
@@ -162,6 +163,15 @@ namespace jp.kshoji.unity.vst3nativehost
             }
 
             EnsurePlanarCapacity(frames);
+
+            if (flushDspMidiQueue)
+            {
+                var sampleRate = host.SampleRate > 0 ? host.SampleRate : AudioSettings.outputSampleRate;
+                if (sampleRate <= 0)
+                    sampleRate = 48000;
+                var blockEnd = (long)(AudioSettings.dspTime * sampleRate) + frames;
+                VstHostDspMidiQueue.Shared.FlushDue(blockEnd);
+            }
 
             if (mode == ProcessMode.Effect)
             {

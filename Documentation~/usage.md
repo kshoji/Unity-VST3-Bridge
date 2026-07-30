@@ -100,6 +100,8 @@ Plugin-native GUI (`IPlugView`) is not hosted.
 | Doc | Topic |
 |-----|--------|
 | [audio-path.md](audio-path.md) | Audio path / realtime rules |
+| [plugin-chain.md](plugin-chain.md) | Multi-plugin chain / channel routes |
+| [scriptable-audio.md](scriptable-audio.md) | Scriptable Audio generator + DSP MIDI |
 | [midi-integration.md](midi-integration.md) | Optional MIDI adapter |
 | [parameters.md](parameters.md) | Parameters / presets / state |
 | [timeline.md](timeline.md) | Timeline parameter automation |

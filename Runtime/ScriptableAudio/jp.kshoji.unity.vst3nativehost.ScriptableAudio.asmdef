@@ -1,0 +1,21 @@
+{
+    "name": "jp.kshoji.unity.vst3nativehost.ScriptableAudio",
+    "rootNamespace": "jp.kshoji.unity.vst3nativehost.scriptableaudio",
+    "references": [
+        "jp.kshoji.unity.vst3nativehost.Runtime",
+        "Unity.Collections"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [
+        "WebGL"
+    ],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "UNITY_6000_3_OR_NEWER"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

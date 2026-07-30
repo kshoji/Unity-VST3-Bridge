@@ -15,9 +15,10 @@
 2. Import sample **VST3 Host Sample**.
 3. Open `VstHostSampleScene`, Enter Play Mode.
 4. Confirm scan lists plugins, Load succeeds, **Note On** produces audio.
-5. Confirm `Assets/MIDI` is **not** required.
+5. Optional chain check: switch to **Plugin Chain**, pick Instrument + Effect, **Build Chain**, **Note On**, toggle **Bypass effect**.
+6. Confirm `Assets/MIDI` is **not** required.
 
-Expected: instrument sound through `VstHostAudioFilter` / `AudioSource`.
+Expected: instrument sound through `VstHostAudioFilter` / `AudioSource` (or `VstPluginChain` in chain mode).
 
 For load/unload crash investigation, add scripting define **`VSTHOST_DEBUG`**
 (Player Settings) to restore `[VstHost] CreateInstance` / `DestroyInstance` traces.

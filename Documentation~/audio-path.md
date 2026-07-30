@@ -1,5 +1,7 @@
 # Audio path
 
+## Classic filter
+
 Unity audio thread → `VstHostAudioFilter.OnAudioFilterRead` → `VstHost_Process` → VST3 `IAudioProcessor::process`.
 
 ## Setup
@@ -10,10 +12,12 @@ Unity audio thread → `VstHostAudioFilter.OnAudioFilterRead` → `VstHost_Proce
 4. Set `PluginId` and `Mode` (`Instrument` or `Effect`).
 5. Send MIDI via `NoteOn` / `VstHostMidiAdapter`.
 
+For multiple plugins on one source, use [`VstPluginChain`](plugin-chain.md) instead of a single filter.
+
 ## Real-time rules
 
 - Do not call Unity APIs from `OnAudioFilterRead`.
-- MIDI arrives on the audio thread through the native lock-free queue only.
+- MIDI arrives on the audio thread through the native lock-free queue only (or `VstHostDspMidiQueue` flushed before Process).
 - Prefer `InitializeFromAudioSettings` before creating instances.
 
 ## Instrument vs effect
@@ -22,3 +26,7 @@ Unity audio thread → `VstHostAudioFilter.OnAudioFilterRead` → `VstHost_Proce
 |------|-------|--------|
 | Instrument | silence | VST out replaces filter buffer |
 | Effect | Unity filter input | processed stereo written back |
+
+## Scriptable Audio (Unity 6.3+)
+
+Optional `VstHostGenerator` (`IAudioGenerator`) path: see [scriptable-audio.md](scriptable-audio.md).
