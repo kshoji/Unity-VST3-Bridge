@@ -1,0 +1,25 @@
+{
+    "name": "jp.kshoji.unity.vst3nativehost.InputSystem",
+    "rootNamespace": "jp.kshoji.unity.vst3nativehost.inputsystem",
+    "references": [
+        "jp.kshoji.unity.vst3nativehost.Runtime",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "FEATURE_VST_HOST_INPUT_SYSTEM"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.inputsystem",
+            "expression": "1.0.0",
+            "define": "FEATURE_VST_HOST_INPUT_SYSTEM"
+        }
+    ],
+    "noEngineReferences": false
+}

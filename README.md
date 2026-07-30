@@ -40,8 +40,11 @@ https://github.com/kshoji/Unity-VST3-Bridge.git
 |-----|---------|
 | [Documentation~/usage.md](Documentation~/usage.md) | Scan paths, quick start, MIDI optional steps |
 | [Documentation~/audio-path.md](Documentation~/audio-path.md) | Audio return path |
-| [Documentation~/midi-integration.md](Documentation~/midi-integration.md) | MIDI adapter details |
+| [Documentation~/midi-integration.md](Documentation~/midi-integration.md) | MIDI adapter, SMF, CC mapping |
 | [Documentation~/parameters.md](Documentation~/parameters.md) | Parameters / presets / state |
+| [Documentation~/timeline.md](Documentation~/timeline.md) | Timeline parameter automation |
+| [Documentation~/animator-input.md](Documentation~/animator-input.md) | Animator + Input System bridges |
+| [Documentation~/editor-tools.md](Documentation~/editor-tools.md) | Editor windows / Project Settings |
 | [Documentation~/verification.md](Documentation~/verification.md) | Manual / IL2CPP / isolation checks |
 | [Documentation~/limitations.md](Documentation~/limitations.md) | Known limits |
 | [Documentation~/package-excludes.md](Documentation~/package-excludes.md) | Why `native~/` (Git/file: vs `.npmignore`) |
@@ -51,6 +54,7 @@ https://github.com/kshoji/Unity-VST3-Bridge.git
 
 Native host (Windows + macOS), MIDI, audio return, parameters / state / IMGUI panel,
 CC→parameter mapping, SMF link, preset assets / browser,
+Timeline parameter tracks, Animator / Input System bridges, editor tools,
 sample scene, IL2CPP Win64 / Standalone OSX verify helpers, and documentation /
 trademark / SDK notices are included.
 

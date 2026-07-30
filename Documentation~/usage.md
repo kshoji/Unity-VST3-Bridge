@@ -79,6 +79,9 @@ skipped. Full steps: [midi-integration.md](midi-integration.md) and the MIDI + V
 CC→parameter mapping, `SmfPlayer` link, and presets:
 [midi-integration.md](midi-integration.md), [parameters.md](parameters.md).
 
+Timeline / Animator / Input System / editor tools:
+[timeline.md](timeline.md), [animator-input.md](animator-input.md), [editor-tools.md](editor-tools.md).
+
 Do **not** register VST routing in MIDI core `midi2Plugins`; keep routing in
 this package.
 
@@ -99,6 +102,9 @@ Plugin-native GUI (`IPlugView`) is not hosted.
 | [audio-path.md](audio-path.md) | Audio path / realtime rules |
 | [midi-integration.md](midi-integration.md) | Optional MIDI adapter |
 | [parameters.md](parameters.md) | Parameters / presets / state |
+| [timeline.md](timeline.md) | Timeline parameter automation |
+| [animator-input.md](animator-input.md) | Animator + Input System |
+| [editor-tools.md](editor-tools.md) | Editor windows / Project Settings |
 | [limitations.md](limitations.md) | Known limits |
 | [package-excludes.md](package-excludes.md) | Why `native~/` stays out of UPM installs |
 | [NOTICE.md](../NOTICE.md) (repo root) | Trademark / SDK / distribution |

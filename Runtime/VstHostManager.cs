@@ -270,6 +270,11 @@ namespace jp.kshoji.unity.vst3nativehost
                 Debug.LogWarning($"[VstHost] SendMidi1 failed for id={pluginId}: {result}");
                 return false;
             }
+
+            VstHostActivity.Raise(
+                VstHostActivityKind.Midi1,
+                pluginId,
+                $"status=0x{status:X2} d1={data1} d2={data2}");
             return true;
         }
 
@@ -375,6 +380,11 @@ namespace jp.kshoji.unity.vst3nativehost
                 Debug.LogWarning($"[VstHost] SetParameterNormalized failed id={pluginId} param={paramId}: {result}");
                 return false;
             }
+
+            VstHostActivity.Raise(
+                VstHostActivityKind.Parameter,
+                pluginId,
+                $"param={paramId} value={value:0.###}");
             return true;
         }
 
@@ -416,6 +426,8 @@ namespace jp.kshoji.unity.vst3nativehost
                 Debug.LogWarning($"[VstHost] SetProgram failed id={pluginId} index={index}: {result}");
                 return false;
             }
+
+            VstHostActivity.Raise(VstHostActivityKind.Program, pluginId, $"program={index}");
             return true;
         }
 
