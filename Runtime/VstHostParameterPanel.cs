@@ -22,6 +22,7 @@ namespace jp.kshoji.unity.vst3nativehost
         private Vector2 scroll;
         private bool windowVisible = true;
         private byte[] cachedState;
+        private MonoBehaviour midiParameterMapper;
 
         public int PluginId
         {
@@ -36,8 +37,17 @@ namespace jp.kshoji.unity.vst3nativehost
 
         private void OnEnable()
         {
+            CacheMapper();
             if (pluginId >= 1)
                 Refresh();
+        }
+
+        private void CacheMapper()
+        {
+            // Optional MIDI Learn target (compiled only with FEATURE_MIDI_PLUGIN).
+            var type = System.Type.GetType(
+                "jp.kshoji.unity.vst3nativehost.VstHostMidiParameterMapper, jp.kshoji.unity.vst3nativehost.Midi");
+            midiParameterMapper = type != null ? GetComponent(type) as MonoBehaviour : null;
         }
 
         public void Refresh()
@@ -60,6 +70,17 @@ namespace jp.kshoji.unity.vst3nativehost
 
             programs.AddRange(VstHostManager.Instance.GetPrograms(pluginId));
             programIndex = Mathf.Clamp(programIndex, 0, Mathf.Max(0, programs.Count - 1));
+        }
+
+        private void NotifyMapperTouched(uint parameterId)
+        {
+            if (midiParameterMapper == null)
+                CacheMapper();
+            if (midiParameterMapper == null)
+                return;
+
+            var method = midiParameterMapper.GetType().GetMethod("NotifyParameterTouched");
+            method?.Invoke(midiParameterMapper, new object[] { parameterId });
         }
 
         private void OnGUI()
@@ -107,6 +128,7 @@ namespace jp.kshoji.unity.vst3nativehost
                     {
                         values[i] = next ? 1f : 0f;
                         VstHostManager.Instance.SetParameterNormalized(pluginId, p.Id, values[i]);
+                        NotifyMapperTouched(p.Id);
                     }
                 }
                 else
@@ -117,6 +139,7 @@ namespace jp.kshoji.unity.vst3nativehost
                     {
                         values[i] = next;
                         VstHostManager.Instance.SetParameterNormalized(pluginId, p.Id, values[i]);
+                        NotifyMapperTouched(p.Id);
                     }
                 }
                 GUI.enabled = true;

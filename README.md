@@ -50,6 +50,7 @@ https://github.com/kshoji/Unity-VST3-Bridge.git
 ## Status
 
 Native host (Windows + macOS), MIDI, audio return, parameters / state / IMGUI panel,
+CC→parameter mapping, SMF link, preset assets / browser,
 sample scene, IL2CPP Win64 / Standalone OSX verify helpers, and documentation /
 trademark / SDK notices are included.
 

@@ -76,6 +76,9 @@ MIDI is **optional**. This package compiles and runs without Unity MIDI Plugin.
 MIDI 2.0 channel voice is down-converted to MIDI 1.0. SysEx / per-note are
 skipped. Full steps: [midi-integration.md](midi-integration.md) and the MIDI + VST section in [verification.md](verification.md).
 
+CC→parameter mapping, `SmfPlayer` link, and presets:
+[midi-integration.md](midi-integration.md), [parameters.md](parameters.md).
+
 Do **not** register VST routing in MIDI core `midi2Plugins`; keep routing in
 this package.
 
