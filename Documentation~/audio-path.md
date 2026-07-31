@@ -18,6 +18,7 @@ For multiple plugins on one source, use [`VstPluginChain`](plugin-chain.md) inst
 
 - Do not call Unity APIs from `OnAudioFilterRead`.
 - MIDI arrives on the audio thread through the native MIDI ring only (mutex-serialized multi-producer; or `VstHostDspMidiQueue` flushed before Process).
+- Managed `SendMidi1` (e.g. from `VstHostMidiAdapter`) is any-thread safe for the native enqueue; Activity / warnings are deferred via `VstHostActivity.PumpMainThread` on the main thread.
 - Prefer `InitializeFromAudioSettings` before creating instances.
 
 ## Instrument vs effect

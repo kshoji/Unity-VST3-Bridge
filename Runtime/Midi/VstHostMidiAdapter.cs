@@ -123,6 +123,12 @@ namespace jp.kshoji.unity.vst3nativehost
                 Register();
         }
 
+        private void LateUpdate()
+        {
+            // Deliver deferred SendMidi1 Activity / fail warnings on the main thread.
+            VstHostActivity.PumpMainThread();
+        }
+
         private void OnDisable()
         {
             Unregister();

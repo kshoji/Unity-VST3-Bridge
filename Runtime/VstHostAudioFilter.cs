@@ -129,6 +129,7 @@ namespace jp.kshoji.unity.vst3nativehost
         {
             VstHostDspMidiQueue.Shared.PumpMainThreadDiagnostics();
             VstHostAudioDiagnostics.PumpMainThreadDiagnostics();
+            VstHostActivity.PumpMainThread();
 
             if (warnedNotReady)
             {

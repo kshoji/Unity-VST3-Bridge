@@ -260,6 +260,11 @@ namespace jp.kshoji.unity.vst3nativehost
         public int LoadPlugin(string filePath, string uid = null) => CreateInstance(filePath, uid);
         public bool UnloadPlugin(int id) => DestroyInstance(id);
 
+        /// <summary>
+        /// Enqueue a MIDI 1.0 short message (any thread; no Unity API / logging here).
+        /// Failures and Activity Monitor lines are delivered on the main thread via
+        /// <see cref="VstHostActivity.PumpMainThread"/>.
+        /// </summary>
         public bool SendMidi1(int pluginId, byte status, byte data1, byte data2)
         {
             if (!initialized) return false;
@@ -267,14 +272,11 @@ namespace jp.kshoji.unity.vst3nativehost
             var result = VstHostNative.VstHost_SendMidi1(pluginId, status, data1, data2);
             if (result != VstHostResult.Ok)
             {
-                Debug.LogWarning($"[VstHost] SendMidi1 failed for id={pluginId}: {result}");
+                VstHostActivity.RecordMidi1Fail(pluginId, result);
                 return false;
             }
 
-            VstHostActivity.Raise(
-                VstHostActivityKind.Midi1,
-                pluginId,
-                $"status=0x{status:X2} d1={data1} d2={data2}");
+            VstHostActivity.EnqueueMidi1(pluginId, status, data1, data2);
             return true;
         }
 

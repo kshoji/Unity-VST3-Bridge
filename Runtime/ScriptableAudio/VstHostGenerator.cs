@@ -52,6 +52,7 @@ namespace jp.kshoji.unity.vst3nativehost.scriptableaudio
         {
             VstHostDspMidiQueue.Shared.PumpMainThreadDiagnostics();
             VstHostAudioDiagnostics.PumpMainThreadDiagnostics();
+            VstHostActivity.PumpMainThread();
         }
 
         public AudioSource SetupAudioSource()

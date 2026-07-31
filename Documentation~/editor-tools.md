@@ -20,7 +20,9 @@ Project Settings → **VST3 Host**:
 
 Device-level MIDI I/O remains in **Window → MIDI → Monitor** (Unity MIDI Plugin).
 Host-side traffic (what the VST actually received / which parameters changed) is shown in
-**Window → VST3 Host → Activity Monitor**.
+**Window → VST3 Host → Activity Monitor**. MIDI sends from `SendMidi1` are queued off-thread and
+delivered on the main thread via `VstHostActivity.PumpMainThread` (device callbacks never call
+`Debug.Log` / `Time.*` directly).
 
 Virtual MIDI Controller (**Window → MIDI → Virtual Controller**) still works when
 routing through `VstHostMidiAdapter`; the VST Virtual Controller talks to the host API directly

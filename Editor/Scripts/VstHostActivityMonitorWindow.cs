@@ -52,6 +52,8 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
 
         private void OnUpdate()
         {
+            VstHostActivity.PumpMainThread();
+
             if (!dirty)
                 return;
             dirty = false;
@@ -77,6 +79,7 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
 
             EditorGUILayout.HelpBox(
                 "Shows VstHostManager MIDI / SetParameter / SetProgram traffic. " +
+                "MIDI lines are deferred to the main thread (safe with device callbacks). " +
                 "For device-level MIDI I/O use Window → MIDI → Monitor when the MIDI Plugin is present.",
                 MessageType.Info);
         }
