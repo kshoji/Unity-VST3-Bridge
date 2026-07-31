@@ -97,6 +97,9 @@ namespace jp.kshoji.unity.vst3nativehost
 
         public bool IsRegistered => registered;
 
+        /// <summary>Channel → plugin id routes (multi-timbral). Empty uses <see cref="TargetPluginId"/> only.</summary>
+        public IList<ChannelRoute> ChannelRoutes => channelRoutes;
+
         /// <summary>Replaces channel→plugin routes used for multi-timbral SMF / controller setups.</summary>
         public void SetChannelRoutes(IEnumerable<ChannelRoute> routes)
         {

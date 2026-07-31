@@ -38,8 +38,19 @@ Enable **Mix External Input** so the Unity filter buffer is seeded into the mix 
 ## Channel routing vs adapter
 
 - Runtime MIDI from `VstHostMidiAdapter` **Channel Routes** still targets plugin ids directly (adapter → `SendMidi1`).
-- Chain **Channel Routes** only affect helpers that call `ResolveInstrumentPluginId` (DSP bridge / tooling). Keep both consistent if you use both paths.
+- Chain **Channel Routes** only affect helpers that call `ResolveInstrumentPluginId` (DSP bridge / tooling).
+
+Use **`VstHostChannelRouteSync`** (`FEATURE_MIDI_PLUGIN`) to copy Chain → Adapter or Adapter → Chain so multi-timbral routes stay aligned.
+
+## MIDI filter / router collaboration
+
+| Component | Role |
+|-----------|------|
+| `MidiChannelFilter` + `VstHostMidiFilterLink` | Filter allow/block channels, forward to Adapter (Adapter unregisters from MidiManager) |
+| `MidiInputRouter` → `VstHostEventSink` | Map MIDI conditions to UnityEvents calling `NoteOn` / `SetParameter` / etc. (EventSink works without MIDI) |
+| Adapter / Chain channel routes | Multi-timbral plugin id / slot selection |
 
 ## Sample
 
 `Samples~/VstHostSample` → **Plugin Chain** mode builds Instrument + Effect slots, with effect bypass for dry/wet A/B.
+The right-hand **Feature demos → Routes** tab edits Chain channel routes at runtime.

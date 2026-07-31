@@ -71,6 +71,12 @@ Enable **Map Program Change To Host Program** on the adapter to call `VstHostMan
 
 Preset assets and the editor browser are documented in [parameters.md](parameters.md).
 
+### Channel filter / input router
+
+- `VstHostMidiFilterLink` — put `MidiChannelFilter` upstream of `VstHostMidiAdapter` (Adapter unregisters from MidiManager and only receives forwards).
+- `VstHostChannelRouteSync` — keep Adapter channel→plugin routes aligned with `VstPluginChain` channel→slot routes.
+- `VstHostEventSink` — UnityEvent targets for `MidiInputRouter` (also works without MIDI).
+
 ## Plugin chain and Scriptable Audio
 
 - Multi-plugin serial / parallel mix: [plugin-chain.md](plugin-chain.md) (`VstPluginChain`).
