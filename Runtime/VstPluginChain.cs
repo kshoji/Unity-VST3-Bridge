@@ -245,6 +245,8 @@ namespace jp.kshoji.unity.vst3nativehost
         {
             // Publish latest main-thread lists so Inspector / IList edits apply within one frame.
             PublishArmedSnapshots();
+            VstHostDspMidiQueue.Shared.PumpMainThreadDiagnostics();
+            VstHostAudioDiagnostics.PumpMainThreadDiagnostics();
 
             if (warnedNotReady)
             {
@@ -330,8 +332,13 @@ namespace jp.kshoji.unity.vst3nativehost
             }
 
             var frames = data.Length / channels;
-            if (frames <= 0 || frames > host.BlockSize)
+            if (frames <= 0)
                 return;
+            if (frames > host.BlockSize)
+            {
+                VstHostAudioDiagnostics.RecordBlockSizeSkip(frames, host.BlockSize);
+                return;
+            }
 
             EnsureCapacity(frames);
 
@@ -393,7 +400,10 @@ namespace jp.kshoji.unity.vst3nativehost
                         Array.Clear(planarL, 0, frames);
                         Array.Clear(planarR, 0, frames);
                         if (!host.Process(slot.pluginId, null, null, planarL, planarR, frames))
+                        {
+                            VstHostAudioDiagnostics.RecordProcessFail();
                             continue;
+                        }
                         ScaleBuffer(planarL, planarR, frames, slot.gain);
                         if (!hasSignal)
                         {
@@ -409,8 +419,12 @@ namespace jp.kshoji.unity.vst3nativehost
                     {
                         if (!hasSignal)
                             continue;
+                        // On failure keep prior temp buffer (skip this effect).
                         if (!host.Process(slot.pluginId, tempL, tempR, planarL, planarR, frames))
+                        {
+                            VstHostAudioDiagnostics.RecordProcessFail();
                             continue;
+                        }
                         ScaleBuffer(planarL, planarR, frames, slot.gain);
                         CopyBuffer(planarL, planarR, tempL, tempR, frames);
                     }
@@ -430,7 +444,10 @@ namespace jp.kshoji.unity.vst3nativehost
                     Array.Clear(planarL, 0, frames);
                     Array.Clear(planarR, 0, frames);
                     if (!host.Process(slot.pluginId, null, null, planarL, planarR, frames))
+                    {
+                        VstHostAudioDiagnostics.RecordProcessFail();
                         continue;
+                    }
                     ScaleBuffer(planarL, planarR, frames, slot.gain);
                     AddBuffer(planarL, planarR, mixL, mixR, frames);
                 }
@@ -442,8 +459,12 @@ namespace jp.kshoji.unity.vst3nativehost
                     if (slot.bypass || slot.pluginId < 1 || slot.role != SlotRole.Effect)
                         continue;
 
+                    // On failure keep prior temp buffer (skip this effect).
                     if (!host.Process(slot.pluginId, tempL, tempR, planarL, planarR, frames))
+                    {
+                        VstHostAudioDiagnostics.RecordProcessFail();
                         continue;
+                    }
                     ScaleBuffer(planarL, planarR, frames, slot.gain);
                     CopyBuffer(planarL, planarR, tempL, tempR, frames);
                 }

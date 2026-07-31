@@ -27,7 +27,9 @@ Do not also run `VstHostAudioFilter` / `VstPluginChain` on the same output path 
 
 `VstHostDspMidiQueue` holds timed MIDI 1.0 short messages (`DspSample` + plugin id). Audio consumers (`VstHostGenerator`, `VstHostAudioFilter`, `VstPluginChain`) flush events with `DspSample <= blockEnd` before `Process`.
 
-Schedule from the main / control thread only via the queue API (or `VstHostDspMidiOutBridge`).
+Schedule from the main / control thread only via the queue API (or `VstHostDspMidiOutBridge`). `Schedule*` methods return `false` when the queue is full (event dropped). Overflows are counted atomically; audio consumers' `LateUpdate` call `PumpMainThreadDiagnostics` and emit a rate-limited warning on the main thread (no logging from the audio thread).
+
+`Process` failures and generator `frames > bufferCapacity` clips are reported the same way via `VstHostAudioDiagnostics` (also pumped from `LateUpdate`).
 
 ## `VstHostDspMidiOutBridge`
 

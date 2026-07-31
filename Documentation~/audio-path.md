@@ -27,6 +27,8 @@ For multiple plugins on one source, use [`VstPluginChain`](plugin-chain.md) inst
 | Instrument | silence | VST out replaces filter buffer |
 | Effect | Unity filter input | processed stereo written back |
 
+If `Process` fails in Effect mode, the Unity input buffer is left unchanged (bypass-equivalent). Failures and `frames > BlockSize` skips are counted on the audio thread and reported as rate-limited warnings from `LateUpdate` via `VstHostAudioDiagnostics` (no logging from the audio thread).
+
 ## Scriptable Audio (Unity 6.3+)
 
 Optional `VstHostGenerator` (`IAudioGenerator`) path: see [scriptable-audio.md](scriptable-audio.md).

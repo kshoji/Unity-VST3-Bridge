@@ -48,6 +48,12 @@ namespace jp.kshoji.unity.vst3nativehost.scriptableaudio
                 SetupAudioSource();
         }
 
+        private void LateUpdate()
+        {
+            VstHostDspMidiQueue.Shared.PumpMainThreadDiagnostics();
+            VstHostAudioDiagnostics.PumpMainThreadDiagnostics();
+        }
+
         public AudioSource SetupAudioSource()
         {
             if (!TryGetComponent(out audioSource))
@@ -169,8 +175,12 @@ namespace jp.kshoji.unity.vst3nativehost.scriptableaudio
             if (frames <= 0 || pluginId < 1 || bufferL == IntPtr.Zero || bufferR == IntPtr.Zero)
                 return 0;
 
+            var requestedFrames = frames;
             if (frames > bufferCapacity)
+            {
+                VstHostAudioDiagnostics.RecordBufferCapacityClip(requestedFrames, bufferCapacity);
                 frames = bufferCapacity;
+            }
 
             if (flushMidi != 0)
             {
@@ -188,7 +198,10 @@ namespace jp.kshoji.unity.vst3nativehost.scriptableaudio
 
             var result = VstHostNative.VstHost_Process(pluginId, null, null, ptrL, ptrR, frames);
             if (result != VstHostResult.Ok)
+            {
+                VstHostAudioDiagnostics.RecordProcessFail();
                 return 0;
+            }
 
             var g = gain;
             var channels = buffer.channelCount;

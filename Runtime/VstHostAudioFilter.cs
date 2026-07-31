@@ -127,6 +127,9 @@ namespace jp.kshoji.unity.vst3nativehost
 
         private void LateUpdate()
         {
+            VstHostDspMidiQueue.Shared.PumpMainThreadDiagnostics();
+            VstHostAudioDiagnostics.PumpMainThreadDiagnostics();
+
             if (warnedNotReady)
             {
                 warnedNotReady = false;
@@ -159,6 +162,7 @@ namespace jp.kshoji.unity.vst3nativehost
             if (frames > host.BlockSize)
             {
                 // Block larger than Initialize max — skip this callback.
+                VstHostAudioDiagnostics.RecordBlockSizeSkip(frames, host.BlockSize);
                 return;
             }
 
@@ -176,15 +180,22 @@ namespace jp.kshoji.unity.vst3nativehost
             if (mode == ProcessMode.Effect)
             {
                 Deinterleave(data, channels, frames, planarL, planarR);
+                // On failure leave Unity input in `data` (bypass-equivalent).
                 if (!host.Process(id, planarL, planarR, planarL, planarR, frames))
+                {
+                    VstHostAudioDiagnostics.RecordProcessFail();
                     return;
+                }
             }
             else
             {
                 Array.Clear(planarL, 0, frames);
                 Array.Clear(planarR, 0, frames);
                 if (!host.Process(id, null, null, planarL, planarR, frames))
+                {
+                    VstHostAudioDiagnostics.RecordProcessFail();
                     return;
+                }
             }
 
             InterleaveReplace(planarL, planarR, data, channels, frames, outputGain);
