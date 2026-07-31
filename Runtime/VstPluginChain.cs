@@ -65,6 +65,8 @@ namespace jp.kshoji.unity.vst3nativehost
         [SerializeField] private float outputGain = 1f;
         [SerializeField] private bool autoPlaySilentSource = true;
         [SerializeField] private bool flushDspMidiQueue = true;
+        [Tooltip("When true, Unity filter input (e.g. upstream Chunity OnAudioFilterRead) is mixed in before instruments / as the effect bus seed.")]
+        [SerializeField] private bool mixExternalInput;
         [SerializeField] private List<ChannelRoute> channelRoutes = new List<ChannelRoute>();
 
         private float[] planarL = Array.Empty<float>();
@@ -90,6 +92,16 @@ namespace jp.kshoji.unity.vst3nativehost
         {
             get => outputGain;
             set => outputGain = value;
+        }
+
+        /// <summary>
+        /// When true, deinterleaves the Unity filter buffer into the mix before processing
+        /// (useful for Chunity / other upstream <c>OnAudioFilterRead</c> → VST effects).
+        /// </summary>
+        public bool MixExternalInput
+        {
+            get => mixExternalInput;
+            set => mixExternalInput = value;
         }
 
         /// <summary>Clears all slots (does not unload native instances).</summary>
@@ -232,20 +244,37 @@ namespace jp.kshoji.unity.vst3nativehost
 
         private void ProcessBlock(VstHostManager host, int frames, float[] data, int channels)
         {
-            ProcessBlockIntoPlanar(host, frames);
+            if (mixExternalInput)
+                Deinterleave(data, channels, frames, mixL, mixR);
+            else
+            {
+                Array.Clear(mixL, 0, frames);
+                Array.Clear(mixR, 0, frames);
+            }
+
+            ProcessBlockIntoPlanar(host, frames, seedFromExternal: mixExternalInput);
             InterleaveReplace(planarL, planarR, data, channels, frames, outputGain);
         }
 
-        private void ProcessBlockIntoPlanar(VstHostManager host, int frames)
+        private void ProcessBlockIntoPlanar(VstHostManager host, int frames, bool seedFromExternal)
         {
-            Array.Clear(mixL, 0, frames);
-            Array.Clear(mixR, 0, frames);
+            if (!seedFromExternal)
+            {
+                Array.Clear(mixL, 0, frames);
+                Array.Clear(mixR, 0, frames);
+            }
 
             if (mixMode == MixMode.StrictSerial)
             {
-                Array.Clear(tempL, 0, frames);
-                Array.Clear(tempR, 0, frames);
-                var hasSignal = false;
+                if (seedFromExternal)
+                    CopyBuffer(mixL, mixR, tempL, tempR, frames);
+                else
+                {
+                    Array.Clear(tempL, 0, frames);
+                    Array.Clear(tempR, 0, frames);
+                }
+
+                var hasSignal = seedFromExternal;
 
                 for (var i = 0; i < slots.Count; i++)
                 {
@@ -327,6 +356,26 @@ namespace jp.kshoji.unity.vst3nativehost
             if (mixR.Length < frames) mixR = new float[frames];
             if (tempL.Length < frames) tempL = new float[frames];
             if (tempR.Length < frames) tempR = new float[frames];
+        }
+
+        private static void Deinterleave(float[] interleaved, int channels, int frames, float[] left, float[] right)
+        {
+            if (channels == 1)
+            {
+                for (var i = 0; i < frames; i++)
+                {
+                    left[i] = interleaved[i];
+                    right[i] = interleaved[i];
+                }
+                return;
+            }
+
+            for (var i = 0; i < frames; i++)
+            {
+                var baseIndex = i * channels;
+                left[i] = interleaved[baseIndex];
+                right[i] = interleaved[baseIndex + 1];
+            }
         }
 
         private static void ScaleBuffer(float[] l, float[] r, int frames, float gain)
