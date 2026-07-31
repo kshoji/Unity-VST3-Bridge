@@ -1,4 +1,4 @@
-#if FEATURE_VST_HOST_INPUT_SYSTEM
+#if FEATURE_INPUT_SYSTEM
 using System;
 using System.Collections.Generic;
 using UnityEngine;

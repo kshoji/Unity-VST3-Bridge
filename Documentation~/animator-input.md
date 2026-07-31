@@ -2,7 +2,7 @@
 
 ## Animator ↔ VST parameters
 
-No changes to MIDI `MidiAnimatorMapping`. Use VST-side bindings:
+No changes to MIDI `MidiAnimatorMapping`. Use VST-side bindings (keeps this package usable without MIDI):
 
 1. Add `VstParameterTarget` + `VstAnimatorDriver`.
 2. Assign Animator and either inline bindings or a **VST3 Host / Animator Mapping** asset.
@@ -15,7 +15,8 @@ Optional invert, response curve, and smoothing time per binding.
 ## Input System → VST
 
 Requires the **Input System** package. Assembly
-`jp.kshoji.unity.vst3nativehost.InputSystem` enables via `versionDefines`.
+`jp.kshoji.unity.vst3nativehost.InputSystem` enables via `versionDefines` →
+**`FEATURE_INPUT_SYSTEM`** (same symbol name as Unity MIDI Plugin Input System integration; assembly-scoped).
 
 ### Direct bridge
 
@@ -37,3 +38,8 @@ Assign `VstParameterTarget` and an `InputActionAsset`.
 
 Use the direct bridge when MIDI Plugin is not present; use the MIDI path when you
 already route game input through MidiManager.
+
+### UnityEvent sink
+
+`VstHostEventSink` exposes `NoteOn` / `NoteOff` / `SetParameter` / `SetProgram` / CC / PitchBend
+for Inspector UnityEvents (including `MidiInputRouter` bindings).

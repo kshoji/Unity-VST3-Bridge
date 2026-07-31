@@ -12,13 +12,13 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [
-        "FEATURE_VST_HOST_INPUT_SYSTEM"
+        "FEATURE_INPUT_SYSTEM"
     ],
     "versionDefines": [
         {
             "name": "com.unity.inputsystem",
             "expression": "1.0.0",
-            "define": "FEATURE_VST_HOST_INPUT_SYSTEM"
+            "define": "FEATURE_INPUT_SYSTEM"
         }
     ],
     "noEngineReferences": false

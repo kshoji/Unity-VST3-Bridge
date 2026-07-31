@@ -1,4 +1,4 @@
-#if FEATURE_VST_HOST_TIMELINE
+#if FEATURE_USE_TIMELINE
 using UnityEngine;
 using UnityEngine.Playables;
 using UnityEngine.Timeline;

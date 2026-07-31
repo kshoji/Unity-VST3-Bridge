@@ -2,7 +2,7 @@
 
 Requires the **Timeline** package (`com.unity.timeline`). The optional assembly
 `jp.kshoji.unity.vst3nativehost.Timeline` enables automatically via asmdef
-`versionDefines`.
+`versionDefines` → scripting define **`FEATURE_USE_TIMELINE`** (same symbol name as Unity MIDI Plugin Timeline integration; defines are assembly-scoped).
 
 ## Parameter track
 

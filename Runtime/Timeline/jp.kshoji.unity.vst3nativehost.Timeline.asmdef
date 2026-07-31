@@ -12,13 +12,13 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [
-        "FEATURE_VST_HOST_TIMELINE"
+        "FEATURE_USE_TIMELINE"
     ],
     "versionDefines": [
         {
             "name": "com.unity.timeline",
             "expression": "1.6.0",
-            "define": "FEATURE_VST_HOST_TIMELINE"
+            "define": "FEATURE_USE_TIMELINE"
         }
     ],
     "noEngineReferences": false
