@@ -54,8 +54,11 @@ https://github.com/kshoji/Unity-VST3-Bridge.git
 
 Native host (Windows + macOS), MIDI, audio return, parameters / state / IMGUI panel,
 CC→parameter mapping, SMF link, preset assets / browser,
-Timeline parameter tracks, Animator / Input System bridges, editor tools,
-sample scene, IL2CPP Win64 / Standalone OSX verify helpers, and documentation /
+Timeline (`FEATURE_USE_TIMELINE`) / Input System (`FEATURE_INPUT_SYSTEM`) /
+Visual Scripting / Animator bridges, plugin chain + channel route sync,
+editor tools (Plugin Browser vendor/tag, Activity Monitor),
+sample scene with Presets / Mapping / Routes demos (VST-only capable),
+IL2CPP Win64 / Standalone OSX verify helpers, and documentation /
 trademark / SDK notices are included.
 
 Import **VST3 Host Sample** from Package Manager, or follow [Documentation~/verification.md](Documentation~/verification.md).
