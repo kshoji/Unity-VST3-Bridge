@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using UnityEngine;
+using Stopwatch = System.Diagnostics.Stopwatch;
 
 namespace jp.kshoji.unity.vst3nativehost
 {
@@ -97,7 +98,7 @@ namespace jp.kshoji.unity.vst3nativehost
                     Status = status,
                     Data1 = data1,
                     Data2 = data2,
-                    TickMs = Environment.TickCount64,
+                    TimeSeconds = NowSeconds(),
                 };
                 midiTail = (midiTail + 1) & (MidiRingCapacity - 1);
                 midiCount++;
@@ -150,7 +151,7 @@ namespace jp.kshoji.unity.vst3nativehost
                 }
 
                 handler(new VstHostActivityEntry(
-                    pending.TickMs / 1000.0,
+                    pending.TimeSeconds,
                     VstHostActivityKind.Midi1,
                     pending.PluginId,
                     $"status=0x{pending.Status:X2} d1={pending.Data1} d2={pending.Data2}"));
@@ -188,7 +189,9 @@ namespace jp.kshoji.unity.vst3nativehost
             }
         }
 
-        private static double NowSeconds() => Environment.TickCount64 / 1000.0;
+        /// <summary>Thread-safe monotonic-ish clock (.NET Standard 2.0 / Unity compatible).</summary>
+        private static double NowSeconds() =>
+            (double)Stopwatch.GetTimestamp() / Stopwatch.Frequency;
 
         private struct MidiPending
         {
@@ -196,7 +199,7 @@ namespace jp.kshoji.unity.vst3nativehost
             public byte Status;
             public byte Data1;
             public byte Data2;
-            public long TickMs;
+            public double TimeSeconds;
         }
     }
 }
