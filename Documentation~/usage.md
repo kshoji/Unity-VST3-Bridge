@@ -88,7 +88,8 @@ this package.
 ## Parameters and state
 
 See [parameters.md](parameters.md). Simple IMGUI panel: `VstHostParameterPanel`.
-Plugin-native GUI (`IPlugView`) is not hosted.
+Plugin-native GUI (`IPlugView`) is not hosted and **not planned** (OS window
+hosting / Win·mac divergence). See [limitations.md](limitations.md).
 
 ## Samples and verification
 

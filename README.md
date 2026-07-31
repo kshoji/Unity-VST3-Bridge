@@ -136,9 +136,10 @@ Define Symbols). Errors and warnings remain always on.
 
 ## Known limitations (summary)
 
-VST3 only · Windows + macOS · no plugin-native GUI · MIDI 2.0 down-convert ·
-commercial plugin compatibility not guaranteed · no third-party `.vst3` in the
-package. Full list: [Documentation~/limitations.md](Documentation~/limitations.md).
+VST3 only · Windows + macOS · no plugin-native GUI (not planned) · MIDI 2.0
+down-convert · commercial plugin compatibility not guaranteed · no third-party
+`.vst3` in the package. Full list:
+[Documentation~/limitations.md](Documentation~/limitations.md).
 
 ## Trademark
 

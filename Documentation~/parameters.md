@@ -56,4 +56,5 @@ Attach `VstPresetBrowser`: host program list, preset asset Apply, and A/B captur
 
 Attach `VstHostParameterPanel`, set `PluginId`, and use the on-screen sliders. Moving a slider notifies `VstHostMidiParameterMapper` on the same GameObject (MIDI Learn).
 
-**Not supported:** embedding the plugin’s native editor (`IPlugView` / HWND).
+**Not supported / not planned:** embedding the plugin’s native editor
+(`IPlugView` / HWND·NSView). See [limitations.md](limitations.md).

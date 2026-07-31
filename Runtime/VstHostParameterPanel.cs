@@ -5,7 +5,7 @@ namespace jp.kshoji.unity.vst3nativehost
 {
     /// <summary>
     /// Minimal host-side parameter / program UI (IMGUI).
-    /// Plugin-native GUI (IPlugView) is not supported.
+    /// Plugin-native GUI (IPlugView) is not supported and not planned.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class VstHostParameterPanel : MonoBehaviour
@@ -163,7 +163,7 @@ namespace jp.kshoji.unity.vst3nativehost
             GUI.enabled = true;
             GUILayout.EndHorizontal();
 
-            GUILayout.Label("Note: plugin-native GUI is not hosted.");
+            GUILayout.Label("Note: plugin-native GUI is not hosted (not planned).");
             GUI.DragWindow();
         }
     }
