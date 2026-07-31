@@ -135,7 +135,12 @@ namespace jp.kshoji.unity.vst3nativehost.sample
         {
             var useChain = playbackMode == PlaybackMode.Chain;
             if (audioFilter != null)
+            {
                 audioFilter.enabled = !useChain;
+                if (!useChain)
+                    audioFilter.EnsureSilentSourcePlaying();
+            }
+
             if (pluginChain != null)
             {
                 pluginChain.enabled = useChain;
@@ -349,14 +354,23 @@ namespace jp.kshoji.unity.vst3nativehost.sample
                 });
                 pluginChain.SetBypass(effectPluginId, effectBypass);
                 pluginChain.EnsureSilentSourcePlaying();
+                if (audioFilter != null)
+                    audioFilter.EnsureSilentSourcePlaying();
 
                 editEffectParameters = false;
                 BindParameterPanel(pluginId);
                 SetMidiTarget(pluginId);
 
+                var instrCat = instrument.Category ?? string.Empty;
+                var warnFxAsInstr = instrCat.IndexOf("Instrument", StringComparison.OrdinalIgnoreCase) < 0
+                    && (instrCat.IndexOf("Fx", StringComparison.OrdinalIgnoreCase) >= 0
+                        || instrCat.IndexOf("Effect", StringComparison.OrdinalIgnoreCase) >= 0);
+
                 status =
                     $"Chain: [{pluginId}] {instrument.Name} → [{effectPluginId}] {effect.Name}"
                     + (effectBypass ? " (effect bypassed)" : string.Empty);
+                if (warnFxAsInstr)
+                    status += " — warning: top list looks like an Effect; pick a synth/Instrument or Note On stays silent";
             }
             finally
             {
@@ -538,7 +552,11 @@ namespace jp.kshoji.unity.vst3nativehost.sample
                     ApplyChainMixMode(VstPluginChain.MixMode.StrictSerial);
                 GUILayout.EndHorizontal();
 
-                var bypass = GUILayout.Toggle(effectBypass, "Bypass effect (A/B dry vs wet)");
+                // Button style so it matches other toolbar toggles (plain Toggle is easy to miss).
+                var bypass = GUILayout.Toggle(
+                    effectBypass,
+                    effectBypass ? "Bypass effect: ON (dry)" : "Bypass effect: OFF (wet)",
+                    "Button");
                 if (bypass != effectBypass)
                     ApplyEffectBypass(bypass);
 

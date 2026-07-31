@@ -25,6 +25,16 @@ For load/unload crash investigation, add scripting define **`VSTHOST_DEBUG`**
 (Player Settings) to restore `[VstHost] CreateInstance` / `DestroyInstance` traces.
 Leave it unset for normal use.
 
+### Unknown / commercial plugins
+
+Compatibility with arbitrary commercial `.vst3` plugins is **not guaranteed**
+([limitations.md](limitations.md)). For a plugin you have not used with this host
+before, validate first on **Windows** (where some native faults inside `process`
+may return `ProcessFailed` instead of killing the process), or in a **dedicated
+throwaway Unity project**. On **macOS**, a fatal fault in the plugin can terminate
+the Editor / Player with no recovery — do not assume an SEH-style catch exists.
+Prefer known-good free/SDK samples (e.g. AGain, mda DX10) for day-to-day smoke tests.
+
 ## MIDI + VST (same Unity project)
 
 1. Open a Unity project that already contains Unity MIDI Plugin.

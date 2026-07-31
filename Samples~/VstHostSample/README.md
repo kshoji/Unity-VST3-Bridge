@@ -30,11 +30,14 @@ Unity MIDI Plugin is **optional**. The sample runs VST-only with manual notes.
 ### Plugin Chain
 
 1. Switch the toolbar to **Plugin Chain**.
-2. Pick an **Instrument** in the first list and an **Effect** in the second (defaults try `AGain` / `Delay`).
-3. Press **Build Chain** — audio path switches from `VstHostAudioFilter` to `VstPluginChain` (`Instrument → Effect`).
-4. Press **Note On** and toggle **Bypass effect** to A/B dry vs wet.
+2. **Top list = Instrument** (synth such as `mda DX10` / NoiseMaker — category should include `Instrument`).
+   **Bottom list = Effect** (e.g. `AGain` / Delay — `Fx` / Effect). Swapping these usually yields silence.
+3. Press **Build Chain** — status should look like `Chain: [1] … → [2] …`. Audio path switches to `VstPluginChain`.
+4. Press **Note On**. Toggle **Bypass effect: ON/OFF** (button under Parallel→Serial / Strict Serial) for dry vs wet.
 5. Use **Edit Instrument params** / **Edit Effect params** to switch what **VST Host Parameters** shows.
 6. Optional: **Parallel→Serial** vs **Strict Serial** mix mode.
+
+If the Game view is short, scroll is not available — make the Game view taller so the Bypass / Note On row is visible.
 
 ## Play mode — right panel (`VstHostSampleFeatureDemos`)
 

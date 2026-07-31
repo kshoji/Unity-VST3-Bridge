@@ -50,6 +50,10 @@ Expects a free/SDK sample such as `again.vst3` / AGain on the machine (not redis
 - Thread checker: `threadchecker_mac.mm`
 - Load/Unload lifecycle matches Windows (`g_audioLifecycleMutex`, module cache held until Terminate)
 - C ABI / export names unchanged (`visibility("default")` in `VstHostNative.h`)
+- **Fault handling:** Windows builds may map some SEH exceptions in `process` to
+  `kVstHostErrorProcessFailed`. **macOS does not** — a plugin crash can exit Unity.
+  V1 does not install signal handlers to “catch and continue” after a fault.
+  See [Documentation~/limitations.md](../../Documentation~/limitations.md).
 
 VST® is a registered trademark of Steinberg Media Technologies GmbH.
 See repository root [NOTICE.md](../../NOTICE.md).
