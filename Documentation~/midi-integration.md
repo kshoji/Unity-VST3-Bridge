@@ -78,3 +78,9 @@ Preset assets and the editor browser are documented in [parameters.md](parameter
 
 Assign `VstHostDspMidiOutBridge` to `MidiDspSequenceScheduler.extraTimedMidiOutput` (or the UMP scheduler) so sequence notes flush into the VST process block on the DSP clock.
 
+## Visual Scripting / Network / Chunity
+
+- [visual-scripting.md](visual-scripting.md)
+- [network-midi.md](network-midi.md)
+- [chunity.md](chunity.md)
+

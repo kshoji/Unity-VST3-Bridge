@@ -31,6 +31,10 @@ Instruments (parallel) ──► mix ──► Effect1 ──► Effect2 ──�
 
 When **Flush Dsp Midi Queue** is enabled (default), the chain drains `VstHostDspMidiQueue.Shared` before processing each block. Pair with `VstHostDspMidiOutBridge` + `MidiDspSequenceScheduler.extraTimedMidiOutput` for sample-accurate notes (Unity 6.3+ Scriptable Audio). See [scriptable-audio.md](scriptable-audio.md).
 
+## External input (Chunity / upstream filters)
+
+Enable **Mix External Input** so the Unity filter buffer is seeded into the mix before instruments / effect slots. Place the upstream `OnAudioFilterRead` component above `VstPluginChain` in the Inspector. See [chunity.md](chunity.md).
+
 ## Channel routing vs adapter
 
 - Runtime MIDI from `VstHostMidiAdapter` **Channel Routes** still targets plugin ids directly (adapter → `SendMidi1`).
