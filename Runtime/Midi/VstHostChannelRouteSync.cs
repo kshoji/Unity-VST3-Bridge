@@ -112,24 +112,24 @@ namespace jp.kshoji.unity.vst3nativehost
                     pluginToSlot[slots[i].pluginId] = i;
             }
 
-            var chainRoutes = chain.ChannelRoutes;
-            chainRoutes.Clear();
-
+            var built = new List<VstPluginChain.ChannelRoute>();
             var adapterRoutes = adapter.ChannelRoutes;
-            if (adapterRoutes == null)
-                return;
-
-            for (var i = 0; i < adapterRoutes.Count; i++)
+            if (adapterRoutes != null)
             {
-                var ar = adapterRoutes[i];
-                if (ar.pluginId < 1 || !pluginToSlot.TryGetValue(ar.pluginId, out var slotIndex))
-                    continue;
-                chainRoutes.Add(new VstPluginChain.ChannelRoute
+                for (var i = 0; i < adapterRoutes.Count; i++)
                 {
-                    channel = ar.channel,
-                    slotIndex = slotIndex,
-                });
+                    var ar = adapterRoutes[i];
+                    if (ar.pluginId < 1 || !pluginToSlot.TryGetValue(ar.pluginId, out var slotIndex))
+                        continue;
+                    built.Add(new VstPluginChain.ChannelRoute
+                    {
+                        channel = ar.channel,
+                        slotIndex = slotIndex,
+                    });
+                }
             }
+
+            chain.SetChannelRoutes(built);
         }
     }
 }

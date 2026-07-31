@@ -20,8 +20,10 @@ Disable any `VstHostAudioFilter` on the same GameObject when using a chain.
 
 1. `VstHostManager.InitializeFromAudioSettings()` and `CreateInstance` for each plugin.
 2. Add `VstPluginChain` + `AudioSource` (silent loop is created automatically).
-3. Fill **Slots** with plugin ids, roles, and optional gain / bypass.
+3. Fill **Slots** with plugin ids, roles, and optional gain / bypass (`SetSlots` / Inspector).
 4. Optional **Channel Routes**: MIDI channel → slot index (instrument). Used by `VstHostDspMidiOutBridge` and `ResolveInstrumentPluginId`.
+
+While playing, prefer `SetSlots` / `ClearSlots` / `SetBypass` / `SetChannelRoutes` (these publish an audio snapshot immediately). Inspector or direct `Slots` / `ChannelRoutes` list edits are armed in `LateUpdate` (within one frame). Do not mutate those lists from the audio thread.
 
 ```text
 Instruments (parallel) ──► mix ──► Effect1 ──► Effect2 ──► output

@@ -79,7 +79,28 @@ namespace jp.kshoji.unity.vst3nativehost
         private bool warnedNotReady;
         private int armed = 1;
 
+        // Main thread owns serialized lists; LateUpdate publishes immutable snapshots for audio.
+        // Double-buffered so the audio thread can keep reading the previous array while main fills the next.
+        private Slot[] slotSnapA = Array.Empty<Slot>();
+        private Slot[] slotSnapB = Array.Empty<Slot>();
+        private ChannelRoute[] routeSnapA = Array.Empty<ChannelRoute>();
+        private ChannelRoute[] routeSnapB = Array.Empty<ChannelRoute>();
+        private bool slotSnapWriteA = true;
+        private bool routeSnapWriteA = true;
+        private Slot[] armedSlots = Array.Empty<Slot>();
+        private ChannelRoute[] armedChannelRoutes = Array.Empty<ChannelRoute>();
+
+        /// <summary>
+        /// Main-thread slot list (Inspector / <see cref="SetSlots"/>). Do not mutate from the audio thread;
+        /// processing uses an armed snapshot. Prefer <see cref="SetSlots"/> / <see cref="ClearSlots"/> /
+        /// <see cref="SetBypass"/> while playing (immediate arm). Direct list edits arm on LateUpdate.
+        /// </summary>
         public IList<Slot> Slots => slots;
+
+        /// <summary>
+        /// Main-thread channel routes. Prefer <see cref="SetChannelRoutes"/> while playing;
+        /// direct list edits are picked up on the next LateUpdate.
+        /// </summary>
         public IList<ChannelRoute> ChannelRoutes => channelRoutes;
 
         public MixMode Mode
@@ -104,22 +125,32 @@ namespace jp.kshoji.unity.vst3nativehost
             set => mixExternalInput = value;
         }
 
-        /// <summary>Clears all slots (does not unload native instances).</summary>
+        /// <summary>Clears all slots (does not unload native instances). Armed immediately for the audio thread.</summary>
         public void ClearSlots()
         {
             slots.Clear();
+            PublishArmedSnapshots();
         }
 
-        /// <summary>Replaces the slot list (does not unload native instances).</summary>
+        /// <summary>Replaces the slot list (does not unload native instances). Armed immediately for the audio thread.</summary>
         public void SetSlots(IEnumerable<Slot> newSlots)
         {
             slots.Clear();
-            if (newSlots == null)
-                return;
-            slots.AddRange(newSlots);
+            if (newSlots != null)
+                slots.AddRange(newSlots);
+            PublishArmedSnapshots();
         }
 
-        /// <summary>Sets bypass on the first slot matching <paramref name="pluginId"/>.</summary>
+        /// <summary>Replaces channel routes. Armed immediately for the audio thread.</summary>
+        public void SetChannelRoutes(IEnumerable<ChannelRoute> newRoutes)
+        {
+            channelRoutes.Clear();
+            if (newRoutes != null)
+                channelRoutes.AddRange(newRoutes);
+            PublishArmedSnapshots();
+        }
+
+        /// <summary>Sets bypass on the first slot matching <paramref name="pluginId"/>. Armed immediately for the audio thread.</summary>
         public bool SetBypass(int pluginId, bool bypass)
         {
             for (var i = 0; i < slots.Count; i++)
@@ -129,33 +160,37 @@ namespace jp.kshoji.unity.vst3nativehost
                     continue;
                 slot.bypass = bypass;
                 slots[i] = slot;
+                PublishArmedSnapshots();
                 return true;
             }
 
             return false;
         }
 
-        /// <summary>Resolves instrument plugin id for a MIDI channel (channel route → first instrument).</summary>
+        /// <summary>
+        /// Resolves instrument plugin id for a MIDI channel (channel route → first instrument).
+        /// Reads the armed snapshot (safe from DSP / MIDI scheduling threads).
+        /// </summary>
         public int ResolveInstrumentPluginId(int channel)
         {
-            if (channelRoutes != null)
+            var routes = Volatile.Read(ref armedChannelRoutes) ?? Array.Empty<ChannelRoute>();
+            var slotSnap = Volatile.Read(ref armedSlots) ?? Array.Empty<Slot>();
+
+            for (var i = 0; i < routes.Length; i++)
             {
-                for (var i = 0; i < channelRoutes.Count; i++)
-                {
-                    var route = channelRoutes[i];
-                    if (route.channel != channel)
-                        continue;
-                    if (route.slotIndex < 0 || route.slotIndex >= slots.Count)
-                        continue;
-                    var slot = slots[route.slotIndex];
-                    if (!slot.bypass && slot.role == SlotRole.Instrument && slot.pluginId >= 1)
-                        return slot.pluginId;
-                }
+                var route = routes[i];
+                if (route.channel != channel)
+                    continue;
+                if (route.slotIndex < 0 || route.slotIndex >= slotSnap.Length)
+                    continue;
+                var slot = slotSnap[route.slotIndex];
+                if (!slot.bypass && slot.role == SlotRole.Instrument && slot.pluginId >= 1)
+                    return slot.pluginId;
             }
 
-            for (var i = 0; i < slots.Count; i++)
+            for (var i = 0; i < slotSnap.Length; i++)
             {
-                var slot = slots[i];
+                var slot = slotSnap[i];
                 if (!slot.bypass && slot.role == SlotRole.Instrument && slot.pluginId >= 1)
                     return slot.pluginId;
             }
@@ -166,6 +201,7 @@ namespace jp.kshoji.unity.vst3nativehost
         private void Awake()
         {
             audioSource = GetComponent<AudioSource>();
+            PublishArmedSnapshots();
             if (autoPlaySilentSource)
                 EnsureSilentSourcePlaying();
         }
@@ -173,6 +209,7 @@ namespace jp.kshoji.unity.vst3nativehost
         private void OnEnable()
         {
             Volatile.Write(ref armed, 1);
+            PublishArmedSnapshots();
             if (autoPlaySilentSource)
                 EnsureSilentSourcePlaying();
         }
@@ -206,11 +243,78 @@ namespace jp.kshoji.unity.vst3nativehost
 
         private void LateUpdate()
         {
+            // Publish latest main-thread lists so Inspector / IList edits apply within one frame.
+            PublishArmedSnapshots();
+
             if (warnedNotReady)
             {
                 warnedNotReady = false;
                 Debug.LogWarning("[VstPluginChain] Host not initialized; audio skipped.");
             }
+        }
+
+        /// <summary>
+        /// Copies serialized lists into the inactive snap buffer and publishes the reference for the audio thread.
+        /// Main thread only.
+        /// </summary>
+        private void PublishArmedSnapshots()
+        {
+            var nextSlots = CopySlotsToWriteBuffer();
+            var nextRoutes = CopyRoutesToWriteBuffer();
+            Volatile.Write(ref armedSlots, nextSlots);
+            Volatile.Write(ref armedChannelRoutes, nextRoutes);
+        }
+
+        private Slot[] CopySlotsToWriteBuffer()
+        {
+            var count = slots != null ? slots.Count : 0;
+            if (count == 0)
+            {
+                slotSnapWriteA = !slotSnapWriteA;
+                return Array.Empty<Slot>();
+            }
+
+            var writeBuf = slotSnapWriteA ? slotSnapA : slotSnapB;
+            if (writeBuf.Length != count)
+            {
+                writeBuf = new Slot[count];
+                if (slotSnapWriteA)
+                    slotSnapA = writeBuf;
+                else
+                    slotSnapB = writeBuf;
+            }
+
+            for (var i = 0; i < count; i++)
+                writeBuf[i] = slots[i];
+
+            slotSnapWriteA = !slotSnapWriteA;
+            return writeBuf;
+        }
+
+        private ChannelRoute[] CopyRoutesToWriteBuffer()
+        {
+            var count = channelRoutes != null ? channelRoutes.Count : 0;
+            if (count == 0)
+            {
+                routeSnapWriteA = !routeSnapWriteA;
+                return Array.Empty<ChannelRoute>();
+            }
+
+            var writeBuf = routeSnapWriteA ? routeSnapA : routeSnapB;
+            if (writeBuf.Length != count)
+            {
+                writeBuf = new ChannelRoute[count];
+                if (routeSnapWriteA)
+                    routeSnapA = writeBuf;
+                else
+                    routeSnapB = writeBuf;
+            }
+
+            for (var i = 0; i < count; i++)
+                writeBuf[i] = channelRoutes[i];
+
+            routeSnapWriteA = !routeSnapWriteA;
+            return writeBuf;
         }
 
         private void OnAudioFilterRead(float[] data, int channels)
@@ -264,6 +368,8 @@ namespace jp.kshoji.unity.vst3nativehost
                 Array.Clear(mixR, 0, frames);
             }
 
+            var slotSnap = Volatile.Read(ref armedSlots) ?? Array.Empty<Slot>();
+
             if (mixMode == MixMode.StrictSerial)
             {
                 if (seedFromExternal)
@@ -276,9 +382,9 @@ namespace jp.kshoji.unity.vst3nativehost
 
                 var hasSignal = seedFromExternal;
 
-                for (var i = 0; i < slots.Count; i++)
+                for (var i = 0; i < slotSnap.Length; i++)
                 {
-                    var slot = slots[i];
+                    var slot = slotSnap[i];
                     if (slot.bypass || slot.pluginId < 1)
                         continue;
 
@@ -315,9 +421,9 @@ namespace jp.kshoji.unity.vst3nativehost
             }
             else
             {
-                for (var i = 0; i < slots.Count; i++)
+                for (var i = 0; i < slotSnap.Length; i++)
                 {
-                    var slot = slots[i];
+                    var slot = slotSnap[i];
                     if (slot.bypass || slot.pluginId < 1 || slot.role != SlotRole.Instrument)
                         continue;
 
@@ -330,9 +436,9 @@ namespace jp.kshoji.unity.vst3nativehost
                 }
 
                 CopyBuffer(mixL, mixR, tempL, tempR, frames);
-                for (var i = 0; i < slots.Count; i++)
+                for (var i = 0; i < slotSnap.Length; i++)
                 {
-                    var slot = slots[i];
+                    var slot = slotSnap[i];
                     if (slot.bypass || slot.pluginId < 1 || slot.role != SlotRole.Effect)
                         continue;
 
