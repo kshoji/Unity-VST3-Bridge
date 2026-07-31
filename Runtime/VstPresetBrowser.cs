@@ -35,7 +35,14 @@ namespace jp.kshoji.unity.vst3nativehost
             }
         }
 
-        public IList<VstPresetAsset> Presets => presets;
+        /// <summary>
+        /// When false, skips the floating IMGUI window (API-only use from samples / custom UI).
+        /// </summary>
+        public bool ShowGui
+        {
+            get => showGui;
+            set => showGui = value;
+        }
 
         private void OnEnable()
         {
