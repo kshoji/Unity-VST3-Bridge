@@ -54,6 +54,15 @@ namespace jp.kshoji.unity.vst3nativehost.sample
         private bool isLoading;
         private bool editEffectParameters;
 
+        /// <summary>Currently loaded instrument plugin id, or -1 when unloaded.</summary>
+        public int CurrentPluginId => pluginId;
+
+        /// <summary>Loaded effect plugin id in Chain mode, or -1.</summary>
+        public int CurrentEffectPluginId => effectPluginId;
+
+        /// <summary>True when the optional MIDI adapter assembly is present.</summary>
+        public bool MidiAssemblyAvailable => midiAvailable;
+
         private void Awake()
         {
             guiScale = Screen.width > Screen.height ? Screen.width / 1024f : Screen.height / 1024f;
@@ -79,6 +88,9 @@ namespace jp.kshoji.unity.vst3nativehost.sample
 
             TryEnsureMidiAdapter();
             ApplyAudioPathEnabledState();
+
+            if (GetComponent<VstHostSampleFeatureDemos>() == null)
+                gameObject.AddComponent<VstHostSampleFeatureDemos>();
         }
 
         private void Start()

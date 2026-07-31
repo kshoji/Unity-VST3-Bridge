@@ -16,7 +16,8 @@
 3. Open `VstHostSampleScene`, Enter Play Mode.
 4. Confirm scan lists plugins, Load succeeds, **Note On** produces audio.
 5. Optional chain check: switch to **Plugin Chain**, pick Instrument + Effect, **Build Chain**, **Note On**, toggle **Bypass effect**.
-6. Confirm `Assets/MIDI` is **not** required.
+6. Optional feature demos (right panel): **Presets** A/B, **Mapping** CC simulation, **Routes** channel→slot.
+7. Confirm `Assets/MIDI` is **not** required.
 
 Expected: instrument sound through `VstHostAudioFilter` / `AudioSource` (or `VstPluginChain` in chain mode).
 
