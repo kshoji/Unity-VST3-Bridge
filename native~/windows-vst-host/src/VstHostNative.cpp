@@ -53,8 +53,9 @@ struct HostState
     Steinberg::Vst::HostApplication hostApp;
 };
 
-// Lock-free SPSC ring for MIDI 1.0 short messages (producer: C# / MIDI adapter,
-// consumer: audio Process). Capacity must be power of two.
+// MIDI 1.0 short-message ring. Multiple producers (main, MIDI callback, audio
+// FlushDue) may call SendMidi1 concurrently; pushes (and drop-oldest retry) are
+// serialized by pushMutex. Capacity must be power of two.
 struct Midi1Message
 {
     uint8_t status = 0;
@@ -70,36 +71,62 @@ public:
 
     bool tryPush(uint8_t status, uint8_t data1, uint8_t data2)
     {
-        const uint32_t w = writeIndex.load(std::memory_order_relaxed);
-        const uint32_t next = (w + 1) & kMask;
-        if (next == readIndex.load(std::memory_order_acquire))
-            return false; // full — drop
+        std::lock_guard<std::mutex> lock(pushMutex);
+        return tryPushUnlocked(status, data1, data2);
+    }
 
-        slots[w] = Midi1Message{status, data1, data2};
-        writeIndex.store(next, std::memory_order_release);
-        return true;
+    // Push under one lock; if full, drop oldest and retry once (prefer live notes).
+    bool pushDropOldest(uint8_t status, uint8_t data1, uint8_t data2)
+    {
+        std::lock_guard<std::mutex> lock(pushMutex);
+        if (tryPushUnlocked(status, data1, data2))
+            return true;
+
+        Midi1Message discarded{};
+        (void)tryPopUnlocked(discarded);
+        return tryPushUnlocked(status, data1, data2);
     }
 
     bool tryPop(Midi1Message& out)
     {
-        const uint32_t r = readIndex.load(std::memory_order_relaxed);
-        if (r == writeIndex.load(std::memory_order_acquire))
-            return false; // empty
-
-        out = slots[r];
-        readIndex.store((r + 1) & kMask, std::memory_order_release);
-        return true;
+        // Same mutex as push: SendMidi1 drop-oldest also pops, so there is no
+        // single-consumer guarantee without serialization.
+        std::lock_guard<std::mutex> lock(pushMutex);
+        return tryPopUnlocked(out);
     }
 
     void clear()
     {
-        readIndex.store(writeIndex.load(std::memory_order_relaxed), std::memory_order_relaxed);
+        std::lock_guard<std::mutex> lock(pushMutex);
+        readIndex = writeIndex;
     }
 
 private:
+    bool tryPushUnlocked(uint8_t status, uint8_t data1, uint8_t data2)
+    {
+        const uint32_t next = (writeIndex + 1) & kMask;
+        if (next == readIndex)
+            return false; // full
+
+        slots[writeIndex] = Midi1Message{status, data1, data2};
+        writeIndex = next;
+        return true;
+    }
+
+    bool tryPopUnlocked(Midi1Message& out)
+    {
+        if (readIndex == writeIndex)
+            return false; // empty
+
+        out = slots[readIndex];
+        readIndex = (readIndex + 1) & kMask;
+        return true;
+    }
+
     Midi1Message slots[kCapacity]{};
-    std::atomic<uint32_t> writeIndex{0};
-    std::atomic<uint32_t> readIndex{0};
+    uint32_t writeIndex = 0;
+    uint32_t readIndex = 0;
+    std::mutex pushMutex;
 };
 
 struct PluginInstance;
@@ -1030,7 +1057,7 @@ VSTHOST_API VstHostResult VstHost_Unload(VstPluginId id)
 }
 
 // ---------------------------------------------------------------------------
-// MIDI (lock-free queue) / Audio
+// MIDI (MPSC-safe queue via push mutex) / Audio
 // ---------------------------------------------------------------------------
 
 VSTHOST_API VstHostResult VstHost_SendMidi1(VstPluginId id,
@@ -1043,14 +1070,9 @@ VSTHOST_API VstHostResult VstHost_SendMidi1(VstPluginId id,
     if (!borrow)
         return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
 
-    if (!borrow->midiQueue.tryPush(status, data1, data2))
-    {
-        // Queue full: drop oldest then retry once (prefer live notes).
-        Midi1Message discarded{};
-        borrow->midiQueue.tryPop(discarded);
-        if (!borrow->midiQueue.tryPush(status, data1, data2))
-            return kVstHostErrorInvalidArgument;
-    }
+    // push + drop-oldest + retry are atomic w.r.t. other producers / drain.
+    if (!borrow->midiQueue.pushDropOldest(status, data1, data2))
+        return kVstHostErrorInvalidArgument;
     return kVstHostOk;
 }
 
