@@ -15,6 +15,8 @@ namespace jp.kshoji.unity.vst3nativehost
         [SerializeField] private bool showPrograms = true;
         [SerializeField] private Rect windowRect = new Rect(20, 20, 360, 480);
 
+        private static int nextGuiWindowId = 20001;
+
         private readonly List<VstParamInfo> parameters = new List<VstParamInfo>();
         private readonly List<float> values = new List<float>();
         private readonly List<string> programs = new List<string>();
@@ -23,6 +25,7 @@ namespace jp.kshoji.unity.vst3nativehost
         private bool windowVisible = true;
         private byte[] cachedState;
         private MonoBehaviour midiParameterMapper;
+        private int guiWindowId;
 
         public int PluginId
         {
@@ -33,6 +36,11 @@ namespace jp.kshoji.unity.vst3nativehost
                 pluginId = value;
                 Refresh();
             }
+        }
+
+        private void Awake()
+        {
+            guiWindowId = nextGuiWindowId++;
         }
 
         private void OnEnable()
@@ -88,7 +96,7 @@ namespace jp.kshoji.unity.vst3nativehost
             if (!windowVisible || pluginId < 1)
                 return;
 
-            windowRect = GUILayout.Window(GetInstanceID(), windowRect, DrawWindow, "VST Host Parameters");
+            windowRect = GUILayout.Window(guiWindowId, windowRect, DrawWindow, "VST Host Parameters");
         }
 
         private void DrawWindow(int id)

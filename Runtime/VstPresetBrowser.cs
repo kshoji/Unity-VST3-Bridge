@@ -16,6 +16,8 @@ namespace jp.kshoji.unity.vst3nativehost
         [SerializeField] private bool showGui = true;
         [SerializeField] private Rect windowRect = new Rect(400, 20, 360, 420);
 
+        private static int nextGuiWindowId = 10001;
+
         private readonly List<string> programs = new List<string>();
         private int programIndex;
         private Vector2 scroll;
@@ -23,6 +25,7 @@ namespace jp.kshoji.unity.vst3nativehost
         private byte[] slotB;
         private bool preferSlotB;
         private string status = string.Empty;
+        private int guiWindowId;
 
         public int PluginId
         {
@@ -42,6 +45,11 @@ namespace jp.kshoji.unity.vst3nativehost
         {
             get => showGui;
             set => showGui = value;
+        }
+
+        private void Awake()
+        {
+            guiWindowId = nextGuiWindowId++;
         }
 
         private void OnEnable()
@@ -137,7 +145,7 @@ namespace jp.kshoji.unity.vst3nativehost
             if (!showGui || pluginId < 1)
                 return;
 
-            windowRect = GUILayout.Window(GetInstanceID(), windowRect, DrawWindow, "VST Preset Browser");
+            windowRect = GUILayout.Window(guiWindowId, windowRect, DrawWindow, "VST Preset Browser");
         }
 
         private void DrawWindow(int id)
