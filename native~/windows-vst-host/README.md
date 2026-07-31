@@ -34,10 +34,10 @@ PluginImporter `.meta` files are committed next to each DLL (same policy as
 | Function | Description |
 |----------|-------------|
 | `VstHost_Initialize` | Set sample rate and block size; install host context |
-| `VstHost_Terminate` | Release all instances and shut down |
+| `VstHost_Terminate` | Release all instances and shut down (2s timeout → `kVstHostErrorBusy`, host left initialized) |
 | `VstHost_ScanFolder` | Enumerate VST3 plugins (null/empty = SDK standard folders) |
 | `VstHost_Load` | Load a .vst3 and create an instance (optional class UID) |
-| `VstHost_Unload` | Destroy a plugin instance (fixed teardown order) |
+| `VstHost_Unload` | Destroy a plugin instance (2s timeout → `kVstHostErrorBusy`, instance kept for retry) |
 | `VstHost_SendMidi1` | Enqueue MIDI 1.0 short message (mutex-serialized MPSC ring; drop-oldest on full) |
 | `VstHost_Process` | Drain MIDI → VST `process` → planar stereo float buffers |
 | `VstHost_GetParameterCount` / `GetParameterInfo` | Enumerate controller parameters |

@@ -16,6 +16,8 @@ namespace jp.kshoji.unity.vst3nativehost
         ErrorInvalidArgument = -7,
         ErrorNotSupported = -8,
         ErrorBufferTooSmall = -9,
+        /// Unload/Terminate timed out while a Process (or borrower) still holds the instance.
+        ErrorBusy = -10,
     }
 
     [Flags]

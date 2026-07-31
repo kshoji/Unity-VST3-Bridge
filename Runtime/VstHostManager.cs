@@ -139,15 +139,30 @@ namespace jp.kshoji.unity.vst3nativehost
             if (!initialized)
             {
                 // Editor: C# may have been domain-reloaded while native stayed initialized.
-                if (VstHostNative.VstHost_Terminate() == VstHostResult.Ok)
+                var orphan = VstHostNative.VstHost_Terminate();
+                if (orphan == VstHostResult.Ok)
                 {
                     loadedPlugins.Clear();
                     VstHostLog.Trace("[VstHost] Terminated (native was still active).");
+                }
+                else if (orphan == VstHostResult.ErrorBusy)
+                {
+                    Debug.LogError(
+                        "[VstHost] Terminate timed out (ErrorBusy): a plugin Process is still active. " +
+                        "Retry Terminate later; the native host was left initialized.");
                 }
                 return;
             }
 
             var result = VstHostNative.VstHost_Terminate();
+            if (result == VstHostResult.ErrorBusy)
+            {
+                Debug.LogError(
+                    "[VstHost] Terminate timed out (ErrorBusy): a plugin Process is still active. " +
+                    "Retry Terminate later; instances were left loaded.");
+                return;
+            }
+
             if (result != VstHostResult.Ok)
                 Debug.LogError($"[VstHost] Terminate failed: {result}");
 
@@ -245,6 +260,14 @@ namespace jp.kshoji.unity.vst3nativehost
                 return true;
 
             var result = VstHostNative.VstHost_Unload(id);
+            if (result == VstHostResult.ErrorBusy)
+            {
+                Debug.LogError(
+                    $"[VstHost] DestroyInstance timed out for id={id} (ErrorBusy): " +
+                    "plugin still processing. Retry Unload later or call Terminate.");
+                return false;
+            }
+
             if (result != VstHostResult.Ok)
             {
                 Debug.LogError($"[VstHost] DestroyInstance failed for id={id}: {result}");
