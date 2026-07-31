@@ -16,6 +16,12 @@
         "FEATURE_USE_VISUALSCRIPTING",
         "UNITY_2021_1_OR_NEWER"
     ],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.visualscripting",
+            "expression": "1.7.0",
+            "define": "FEATURE_USE_VISUALSCRIPTING"
+        }
+    ],
     "noEngineReferences": false
 }

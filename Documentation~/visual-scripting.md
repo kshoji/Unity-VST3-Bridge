@@ -1,11 +1,13 @@
 # Visual Scripting
 
-Optional nodes under category **VST3 Host** (requires `FEATURE_USE_VISUALSCRIPTING`).
+Optional nodes under category **VST3 Host**.
 
 ## Setup
 
 1. Install **Visual Scripting** (`com.unity.visualscripting`).
-2. Ensure scripting define **`FEATURE_USE_VISUALSCRIPTING`**.
+2. The assembly enables via asmdef `versionDefines` → **`FEATURE_USE_VISUALSCRIPTING`**
+   (same symbol as Unity MIDI Plugin VS integration; assembly-scoped).
+   You can also set the define manually in Player Settings if needed.
 3. Menu **Window → VST3 Host → Visual Scripting → Register Nodes** (adds the assembly to the Node Library and regenerates).
 4. For event units, add **`VstVisualScriptingBridge`** on the same GameObject as the Script Machine.
 
