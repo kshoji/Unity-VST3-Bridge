@@ -12,6 +12,7 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
         private Vector2 listScroll;
         private string filter = string.Empty;
         private string categoryFilter = "All";
+        private string vendorFilter = "All";
         private int selectedIndex;
         private int previewPluginId = -1;
         private int previewNote = 60;
@@ -78,12 +79,19 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
 
         private void DrawFilters()
         {
-            filter = EditorGUILayout.TextField("Name / Vendor", filter);
+            filter = EditorGUILayout.TextField("Name / Path", filter);
             var categories = new List<string> { "All" };
             categories.AddRange(scanned.Select(p => string.IsNullOrEmpty(p.Category) ? "(none)" : p.Category).Distinct().OrderBy(c => c));
             var catIndex = Mathf.Max(0, categories.IndexOf(categoryFilter));
             catIndex = EditorGUILayout.Popup("Category", catIndex, categories.ToArray());
             categoryFilter = categories[catIndex];
+
+            // Vendor acts as the practical "tag" axis for installed VST3 class info.
+            var vendors = new List<string> { "All" };
+            vendors.AddRange(scanned.Select(p => string.IsNullOrEmpty(p.Vendor) ? "(none)" : p.Vendor).Distinct().OrderBy(c => c));
+            var vendorIndex = Mathf.Max(0, vendors.IndexOf(vendorFilter));
+            vendorIndex = EditorGUILayout.Popup("Vendor / Tag", vendorIndex, vendors.ToArray());
+            vendorFilter = vendors[vendorIndex];
         }
 
         private void DrawList()
@@ -171,6 +179,12 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
             {
                 var want = categoryFilter == "(none)" ? string.Empty : categoryFilter;
                 q = q.Where(p => (p.Category ?? string.Empty) == want);
+            }
+
+            if (!string.IsNullOrEmpty(vendorFilter) && vendorFilter != "All")
+            {
+                var wantVendor = vendorFilter == "(none)" ? string.Empty : vendorFilter;
+                q = q.Where(p => (p.Vendor ?? string.Empty) == wantVendor);
             }
 
             return q;
