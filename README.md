@@ -40,8 +40,11 @@ https://github.com/kshoji/Unity-VST3-Bridge.git
 |-----|---------|
 | [Documentation~/usage.md](Documentation~/usage.md) | Scan paths, quick start, MIDI optional steps |
 | [Documentation~/audio-path.md](Documentation~/audio-path.md) | Audio return path |
-| [Documentation~/midi-integration.md](Documentation~/midi-integration.md) | MIDI adapter details |
+| [Documentation~/midi-integration.md](Documentation~/midi-integration.md) | MIDI adapter, SMF, CC mapping |
 | [Documentation~/parameters.md](Documentation~/parameters.md) | Parameters / presets / state |
+| [Documentation~/timeline.md](Documentation~/timeline.md) | Timeline parameter automation |
+| [Documentation~/animator-input.md](Documentation~/animator-input.md) | Animator + Input System bridges |
+| [Documentation~/editor-tools.md](Documentation~/editor-tools.md) | Editor windows / Project Settings |
 | [Documentation~/verification.md](Documentation~/verification.md) | Manual / IL2CPP / isolation checks |
 | [Documentation~/limitations.md](Documentation~/limitations.md) | Known limits |
 | [Documentation~/package-excludes.md](Documentation~/package-excludes.md) | Why `native~/` (Git/file: vs `.npmignore`) |
@@ -50,7 +53,12 @@ https://github.com/kshoji/Unity-VST3-Bridge.git
 ## Status
 
 Native host (Windows + macOS), MIDI, audio return, parameters / state / IMGUI panel,
-sample scene, IL2CPP Win64 / Standalone OSX verify helpers, and documentation /
+CC→parameter mapping, SMF link, preset assets / browser,
+Timeline (`FEATURE_USE_TIMELINE`) / Input System (`FEATURE_INPUT_SYSTEM`) /
+Visual Scripting / Animator bridges, plugin chain + channel route sync,
+editor tools (Plugin Browser vendor/tag, Activity Monitor),
+sample scene with Presets / Mapping / Routes demos (VST-only capable),
+IL2CPP Win64 / Standalone OSX verify helpers, and documentation /
 trademark / SDK notices are included.
 
 Import **VST3 Host Sample** from Package Manager, or follow [Documentation~/verification.md](Documentation~/verification.md).
@@ -128,9 +136,10 @@ Define Symbols). Errors and warnings remain always on.
 
 ## Known limitations (summary)
 
-VST3 only · Windows + macOS · no plugin-native GUI · MIDI 2.0 down-convert ·
-commercial plugin compatibility not guaranteed · no third-party `.vst3` in the
-package. Full list: [Documentation~/limitations.md](Documentation~/limitations.md).
+VST3 only · Windows + macOS · no plugin-native GUI (not planned) · MIDI 2.0
+down-convert · commercial plugin compatibility not guaranteed · no third-party
+`.vst3` in the package. Full list:
+[Documentation~/limitations.md](Documentation~/limitations.md).
 
 ## Trademark
 

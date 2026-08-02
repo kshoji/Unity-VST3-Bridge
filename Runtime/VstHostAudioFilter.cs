@@ -26,6 +26,7 @@ namespace jp.kshoji.unity.vst3nativehost
         [SerializeField] private ProcessMode mode = ProcessMode.Instrument;
         [SerializeField] private float outputGain = 1f;
         [SerializeField] private bool autoPlaySilentSource = true;
+        [SerializeField] private bool flushDspMidiQueue = true;
 
         private float[] planarL = Array.Empty<float>();
         private float[] planarR = Array.Empty<float>();
@@ -106,8 +107,8 @@ namespace jp.kshoji.unity.vst3nativehost
             Volatile.Write(ref pendingPluginId, -1);
             Volatile.Write(ref armedPluginId, -1);
             Volatile.Write(ref pluginId, -1);
-            if (audioSource != null && audioSource.isPlaying)
-                audioSource.Pause();
+            // Do not Pause the AudioSource: the same GameObject may host VstPluginChain,
+            // which needs the silent clip to keep playing for OnAudioFilterRead.
         }
 
         /// <summary>
@@ -126,6 +127,10 @@ namespace jp.kshoji.unity.vst3nativehost
 
         private void LateUpdate()
         {
+            VstHostDspMidiQueue.Shared.PumpMainThreadDiagnostics();
+            VstHostAudioDiagnostics.PumpMainThreadDiagnostics();
+            VstHostActivity.PumpMainThread();
+
             if (warnedNotReady)
             {
                 warnedNotReady = false;
@@ -158,23 +163,40 @@ namespace jp.kshoji.unity.vst3nativehost
             if (frames > host.BlockSize)
             {
                 // Block larger than Initialize max — skip this callback.
+                VstHostAudioDiagnostics.RecordBlockSizeSkip(frames, host.BlockSize);
                 return;
             }
 
             EnsurePlanarCapacity(frames);
 
+            if (flushDspMidiQueue)
+            {
+                var sampleRate = host.SampleRate > 0 ? host.SampleRate : AudioSettings.outputSampleRate;
+                if (sampleRate <= 0)
+                    sampleRate = 48000;
+                var blockEnd = (long)(AudioSettings.dspTime * sampleRate) + frames;
+                VstHostDspMidiQueue.Shared.FlushDue(blockEnd);
+            }
+
             if (mode == ProcessMode.Effect)
             {
                 Deinterleave(data, channels, frames, planarL, planarR);
+                // On failure leave Unity input in `data` (bypass-equivalent).
                 if (!host.Process(id, planarL, planarR, planarL, planarR, frames))
+                {
+                    VstHostAudioDiagnostics.RecordProcessFail();
                     return;
+                }
             }
             else
             {
                 Array.Clear(planarL, 0, frames);
                 Array.Clear(planarR, 0, frames);
                 if (!host.Process(id, null, null, planarL, planarR, frames))
+                {
+                    VstHostAudioDiagnostics.RecordProcessFail();
                     return;
+                }
             }
 
             InterleaveReplace(planarL, planarR, data, channels, frames, outputGain);

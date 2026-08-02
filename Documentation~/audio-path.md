@@ -1,5 +1,7 @@
 # Audio path
 
+## Classic filter
+
 Unity audio thread → `VstHostAudioFilter.OnAudioFilterRead` → `VstHost_Process` → VST3 `IAudioProcessor::process`.
 
 ## Setup
@@ -10,10 +12,13 @@ Unity audio thread → `VstHostAudioFilter.OnAudioFilterRead` → `VstHost_Proce
 4. Set `PluginId` and `Mode` (`Instrument` or `Effect`).
 5. Send MIDI via `NoteOn` / `VstHostMidiAdapter`.
 
+For multiple plugins on one source, use [`VstPluginChain`](plugin-chain.md) instead of a single filter.
+
 ## Real-time rules
 
 - Do not call Unity APIs from `OnAudioFilterRead`.
-- MIDI arrives on the audio thread through the native lock-free queue only.
+- MIDI arrives on the audio thread through the native MIDI ring only (mutex-serialized multi-producer; or `VstHostDspMidiQueue` flushed before Process).
+- Managed `SendMidi1` (e.g. from `VstHostMidiAdapter`) is any-thread safe for the native enqueue; Activity / warnings are deferred via `VstHostActivity.PumpMainThread` on the main thread.
 - Prefer `InitializeFromAudioSettings` before creating instances.
 
 ## Instrument vs effect
@@ -22,3 +27,9 @@ Unity audio thread → `VstHostAudioFilter.OnAudioFilterRead` → `VstHost_Proce
 |------|-------|--------|
 | Instrument | silence | VST out replaces filter buffer |
 | Effect | Unity filter input | processed stereo written back |
+
+If `Process` fails in Effect mode, the Unity input buffer is left unchanged (bypass-equivalent). Failures and `frames > BlockSize` skips are counted on the audio thread and reported as rate-limited warnings from `LateUpdate` via `VstHostAudioDiagnostics` (no logging from the audio thread).
+
+## Scriptable Audio (Unity 6.3+)
+
+Optional `VstHostGenerator` (`IAudioGenerator`) path: see [scriptable-audio.md](scriptable-audio.md).

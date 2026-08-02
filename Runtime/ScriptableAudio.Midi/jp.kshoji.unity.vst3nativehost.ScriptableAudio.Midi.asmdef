@@ -1,0 +1,23 @@
+{
+    "name": "jp.kshoji.unity.vst3nativehost.ScriptableAudio.Midi",
+    "rootNamespace": "jp.kshoji.unity.vst3nativehost.scriptableaudio",
+    "references": [
+        "jp.kshoji.unity.vst3nativehost.Runtime",
+        "jp.kshoji.midi.scriptableaudio"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [
+        "WebGL"
+    ],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "FEATURE_MIDI_PLUGIN",
+        "FEATURE_SCRIPTABLE_AUDIO",
+        "UNITY_6000_3_OR_NEWER"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,22 @@
+{
+    "name": "jp.kshoji.unity.vst3nativehost.Midi.Network",
+    "rootNamespace": "jp.kshoji.unity.vst3nativehost",
+    "references": [
+        "jp.kshoji.unity.vst3nativehost.Runtime",
+        "jp.kshoji.unity.vst3nativehost.Midi",
+        "jp.kshoji.midi",
+        "jp.kshoji.midi.net"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "FEATURE_MIDI_PLUGIN",
+        "FEATURE_MIDI_NETWORK"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

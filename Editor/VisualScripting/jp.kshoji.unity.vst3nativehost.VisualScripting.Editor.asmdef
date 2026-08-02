@@ -1,0 +1,27 @@
+{
+    "name": "jp.kshoji.unity.vst3nativehost.VisualScripting.Editor",
+    "rootNamespace": "jp.kshoji.unity.vst3nativehost.visualscripting.Editor",
+    "references": [
+        "jp.kshoji.unity.vst3nativehost.VisualScripting"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "FEATURE_USE_VISUALSCRIPTING",
+        "UNITY_2021_1_OR_NEWER"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.visualscripting",
+            "expression": "1.7.0",
+            "define": "FEATURE_USE_VISUALSCRIPTING"
+        }
+    ],
+    "noEngineReferences": false
+}

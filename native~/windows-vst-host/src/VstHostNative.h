@@ -20,6 +20,8 @@ enum VstHostResult : int32_t
     kVstHostErrorInvalidArgument = -7,
     kVstHostErrorNotSupported = -8,
     kVstHostErrorBufferTooSmall = -9,
+    /// Unload/Terminate timed out while Process (or another borrower) still holds the instance.
+    kVstHostErrorBusy = -10,
 };
 
 using VstPluginId = int32_t;

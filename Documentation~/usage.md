@@ -76,13 +76,20 @@ MIDI is **optional**. This package compiles and runs without Unity MIDI Plugin.
 MIDI 2.0 channel voice is down-converted to MIDI 1.0. SysEx / per-note are
 skipped. Full steps: [midi-integration.md](midi-integration.md) and the MIDI + VST section in [verification.md](verification.md).
 
+CC→parameter mapping, `SmfPlayer` link, and presets:
+[midi-integration.md](midi-integration.md), [parameters.md](parameters.md).
+
+Timeline / Animator / Input System / editor tools:
+[timeline.md](timeline.md), [animator-input.md](animator-input.md), [editor-tools.md](editor-tools.md).
+
 Do **not** register VST routing in MIDI core `midi2Plugins`; keep routing in
 this package.
 
 ## Parameters and state
 
 See [parameters.md](parameters.md). Simple IMGUI panel: `VstHostParameterPanel`.
-Plugin-native GUI (`IPlugView`) is not hosted.
+Plugin-native GUI (`IPlugView`) is not hosted and **not planned** (OS window
+hosting / Win·mac divergence). See [limitations.md](limitations.md).
 
 ## Samples and verification
 
@@ -94,8 +101,16 @@ Plugin-native GUI (`IPlugView`) is not hosted.
 | Doc | Topic |
 |-----|--------|
 | [audio-path.md](audio-path.md) | Audio path / realtime rules |
+| [plugin-chain.md](plugin-chain.md) | Multi-plugin chain / channel routes |
+| [scriptable-audio.md](scriptable-audio.md) | Scriptable Audio generator + DSP MIDI |
+| [visual-scripting.md](visual-scripting.md) | Visual Scripting units / events |
+| [network-midi.md](network-midi.md) | Network MIDI → local VST |
+| [chunity.md](chunity.md) | ChucK ↔ VST hybrid |
 | [midi-integration.md](midi-integration.md) | Optional MIDI adapter |
 | [parameters.md](parameters.md) | Parameters / presets / state |
+| [timeline.md](timeline.md) | Timeline parameter automation |
+| [animator-input.md](animator-input.md) | Animator + Input System |
+| [editor-tools.md](editor-tools.md) | Editor windows / Project Settings |
 | [limitations.md](limitations.md) | Known limits |
 | [package-excludes.md](package-excludes.md) | Why `native~/` stays out of UPM installs |
 | [NOTICE.md](../NOTICE.md) (repo root) | Trademark / SDK / distribution |

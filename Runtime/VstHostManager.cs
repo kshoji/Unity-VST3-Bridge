@@ -139,15 +139,30 @@ namespace jp.kshoji.unity.vst3nativehost
             if (!initialized)
             {
                 // Editor: C# may have been domain-reloaded while native stayed initialized.
-                if (VstHostNative.VstHost_Terminate() == VstHostResult.Ok)
+                var orphan = VstHostNative.VstHost_Terminate();
+                if (orphan == VstHostResult.Ok)
                 {
                     loadedPlugins.Clear();
                     VstHostLog.Trace("[VstHost] Terminated (native was still active).");
+                }
+                else if (orphan == VstHostResult.ErrorBusy)
+                {
+                    Debug.LogError(
+                        "[VstHost] Terminate timed out (ErrorBusy): a plugin Process is still active. " +
+                        "Retry Terminate later; the native host was left initialized.");
                 }
                 return;
             }
 
             var result = VstHostNative.VstHost_Terminate();
+            if (result == VstHostResult.ErrorBusy)
+            {
+                Debug.LogError(
+                    "[VstHost] Terminate timed out (ErrorBusy): a plugin Process is still active. " +
+                    "Retry Terminate later; instances were left loaded.");
+                return;
+            }
+
             if (result != VstHostResult.Ok)
                 Debug.LogError($"[VstHost] Terminate failed: {result}");
 
@@ -245,6 +260,14 @@ namespace jp.kshoji.unity.vst3nativehost
                 return true;
 
             var result = VstHostNative.VstHost_Unload(id);
+            if (result == VstHostResult.ErrorBusy)
+            {
+                Debug.LogError(
+                    $"[VstHost] DestroyInstance timed out for id={id} (ErrorBusy): " +
+                    "plugin still processing. Retry Unload later or call Terminate.");
+                return false;
+            }
+
             if (result != VstHostResult.Ok)
             {
                 Debug.LogError($"[VstHost] DestroyInstance failed for id={id}: {result}");
@@ -260,6 +283,11 @@ namespace jp.kshoji.unity.vst3nativehost
         public int LoadPlugin(string filePath, string uid = null) => CreateInstance(filePath, uid);
         public bool UnloadPlugin(int id) => DestroyInstance(id);
 
+        /// <summary>
+        /// Enqueue a MIDI 1.0 short message (any thread; no Unity API / logging here).
+        /// Failures and Activity Monitor lines are delivered on the main thread via
+        /// <see cref="VstHostActivity.PumpMainThread"/>.
+        /// </summary>
         public bool SendMidi1(int pluginId, byte status, byte data1, byte data2)
         {
             if (!initialized) return false;
@@ -267,9 +295,11 @@ namespace jp.kshoji.unity.vst3nativehost
             var result = VstHostNative.VstHost_SendMidi1(pluginId, status, data1, data2);
             if (result != VstHostResult.Ok)
             {
-                Debug.LogWarning($"[VstHost] SendMidi1 failed for id={pluginId}: {result}");
+                VstHostActivity.RecordMidi1Fail(pluginId, result);
                 return false;
             }
+
+            VstHostActivity.EnqueueMidi1(pluginId, status, data1, data2);
             return true;
         }
 
@@ -375,6 +405,11 @@ namespace jp.kshoji.unity.vst3nativehost
                 Debug.LogWarning($"[VstHost] SetParameterNormalized failed id={pluginId} param={paramId}: {result}");
                 return false;
             }
+
+            VstHostActivity.Raise(
+                VstHostActivityKind.Parameter,
+                pluginId,
+                $"param={paramId} value={value:0.###}");
             return true;
         }
 
@@ -416,6 +451,8 @@ namespace jp.kshoji.unity.vst3nativehost
                 Debug.LogWarning($"[VstHost] SetProgram failed id={pluginId} index={index}: {result}");
                 return false;
             }
+
+            VstHostActivity.Raise(VstHostActivityKind.Program, pluginId, $"program={index}");
             return true;
         }
 

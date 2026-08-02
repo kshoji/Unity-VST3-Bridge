@@ -5,7 +5,7 @@ namespace jp.kshoji.unity.vst3nativehost
 {
     /// <summary>
     /// Minimal host-side parameter / program UI (IMGUI).
-    /// Plugin-native GUI (IPlugView) is not supported.
+    /// Plugin-native GUI (IPlugView) is not supported and not planned.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class VstHostParameterPanel : MonoBehaviour
@@ -15,6 +15,8 @@ namespace jp.kshoji.unity.vst3nativehost
         [SerializeField] private bool showPrograms = true;
         [SerializeField] private Rect windowRect = new Rect(20, 20, 360, 480);
 
+        private static int nextGuiWindowId = 20001;
+
         private readonly List<VstParamInfo> parameters = new List<VstParamInfo>();
         private readonly List<float> values = new List<float>();
         private readonly List<string> programs = new List<string>();
@@ -22,6 +24,8 @@ namespace jp.kshoji.unity.vst3nativehost
         private Vector2 scroll;
         private bool windowVisible = true;
         private byte[] cachedState;
+        private MonoBehaviour midiParameterMapper;
+        private int guiWindowId;
 
         public int PluginId
         {
@@ -34,10 +38,24 @@ namespace jp.kshoji.unity.vst3nativehost
             }
         }
 
+        private void Awake()
+        {
+            guiWindowId = nextGuiWindowId++;
+        }
+
         private void OnEnable()
         {
+            CacheMapper();
             if (pluginId >= 1)
                 Refresh();
+        }
+
+        private void CacheMapper()
+        {
+            // Optional MIDI Learn target (compiled only with FEATURE_MIDI_PLUGIN).
+            var type = System.Type.GetType(
+                "jp.kshoji.unity.vst3nativehost.VstHostMidiParameterMapper, jp.kshoji.unity.vst3nativehost.Midi");
+            midiParameterMapper = type != null ? GetComponent(type) as MonoBehaviour : null;
         }
 
         public void Refresh()
@@ -62,12 +80,23 @@ namespace jp.kshoji.unity.vst3nativehost
             programIndex = Mathf.Clamp(programIndex, 0, Mathf.Max(0, programs.Count - 1));
         }
 
+        private void NotifyMapperTouched(uint parameterId)
+        {
+            if (midiParameterMapper == null)
+                CacheMapper();
+            if (midiParameterMapper == null)
+                return;
+
+            var method = midiParameterMapper.GetType().GetMethod("NotifyParameterTouched");
+            method?.Invoke(midiParameterMapper, new object[] { parameterId });
+        }
+
         private void OnGUI()
         {
             if (!windowVisible || pluginId < 1)
                 return;
 
-            windowRect = GUILayout.Window(GetInstanceID(), windowRect, DrawWindow, "VST Host Parameters");
+            windowRect = GUILayout.Window(guiWindowId, windowRect, DrawWindow, "VST Host Parameters");
         }
 
         private void DrawWindow(int id)
@@ -107,6 +136,7 @@ namespace jp.kshoji.unity.vst3nativehost
                     {
                         values[i] = next ? 1f : 0f;
                         VstHostManager.Instance.SetParameterNormalized(pluginId, p.Id, values[i]);
+                        NotifyMapperTouched(p.Id);
                     }
                 }
                 else
@@ -117,6 +147,7 @@ namespace jp.kshoji.unity.vst3nativehost
                     {
                         values[i] = next;
                         VstHostManager.Instance.SetParameterNormalized(pluginId, p.Id, values[i]);
+                        NotifyMapperTouched(p.Id);
                     }
                 }
                 GUI.enabled = true;
@@ -140,7 +171,7 @@ namespace jp.kshoji.unity.vst3nativehost
             GUI.enabled = true;
             GUILayout.EndHorizontal();
 
-            GUILayout.Label("Note: plugin-native GUI is not hosted.");
+            GUILayout.Label("Note: plugin-native GUI is not hosted (not planned).");
             GUI.DragWindow();
         }
     }

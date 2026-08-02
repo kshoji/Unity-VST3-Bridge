@@ -53,8 +53,9 @@ struct HostState
     Steinberg::Vst::HostApplication hostApp;
 };
 
-// Lock-free SPSC ring for MIDI 1.0 short messages (producer: C# / MIDI adapter,
-// consumer: audio Process). Capacity must be power of two.
+// MIDI 1.0 short-message ring. Multiple producers (main, MIDI callback, audio
+// FlushDue) may call SendMidi1 concurrently; pushes (and drop-oldest retry) are
+// serialized by pushMutex. Capacity must be power of two.
 struct Midi1Message
 {
     uint8_t status = 0;
@@ -70,36 +71,62 @@ public:
 
     bool tryPush(uint8_t status, uint8_t data1, uint8_t data2)
     {
-        const uint32_t w = writeIndex.load(std::memory_order_relaxed);
-        const uint32_t next = (w + 1) & kMask;
-        if (next == readIndex.load(std::memory_order_acquire))
-            return false; // full — drop
+        std::lock_guard<std::mutex> lock(pushMutex);
+        return tryPushUnlocked(status, data1, data2);
+    }
 
-        slots[w] = Midi1Message{status, data1, data2};
-        writeIndex.store(next, std::memory_order_release);
-        return true;
+    // Push under one lock; if full, drop oldest and retry once (prefer live notes).
+    bool pushDropOldest(uint8_t status, uint8_t data1, uint8_t data2)
+    {
+        std::lock_guard<std::mutex> lock(pushMutex);
+        if (tryPushUnlocked(status, data1, data2))
+            return true;
+
+        Midi1Message discarded{};
+        (void)tryPopUnlocked(discarded);
+        return tryPushUnlocked(status, data1, data2);
     }
 
     bool tryPop(Midi1Message& out)
     {
-        const uint32_t r = readIndex.load(std::memory_order_relaxed);
-        if (r == writeIndex.load(std::memory_order_acquire))
-            return false; // empty
-
-        out = slots[r];
-        readIndex.store((r + 1) & kMask, std::memory_order_release);
-        return true;
+        // Same mutex as push: SendMidi1 drop-oldest also pops, so there is no
+        // single-consumer guarantee without serialization.
+        std::lock_guard<std::mutex> lock(pushMutex);
+        return tryPopUnlocked(out);
     }
 
     void clear()
     {
-        readIndex.store(writeIndex.load(std::memory_order_relaxed), std::memory_order_relaxed);
+        std::lock_guard<std::mutex> lock(pushMutex);
+        readIndex = writeIndex;
     }
 
 private:
+    bool tryPushUnlocked(uint8_t status, uint8_t data1, uint8_t data2)
+    {
+        const uint32_t next = (writeIndex + 1) & kMask;
+        if (next == readIndex)
+            return false; // full
+
+        slots[writeIndex] = Midi1Message{status, data1, data2};
+        writeIndex = next;
+        return true;
+    }
+
+    bool tryPopUnlocked(Midi1Message& out)
+    {
+        if (readIndex == writeIndex)
+            return false; // empty
+
+        out = slots[readIndex];
+        readIndex = (readIndex + 1) & kMask;
+        return true;
+    }
+
     Midi1Message slots[kCapacity]{};
-    std::atomic<uint32_t> writeIndex{0};
-    std::atomic<uint32_t> readIndex{0};
+    uint32_t writeIndex = 0;
+    uint32_t readIndex = 0;
+    std::mutex pushMutex;
 };
 
 struct PluginInstance;
@@ -334,9 +361,13 @@ void drainMidiQueue(PluginInstance& inst)
 }
 
 std::mutex g_mutex;
-std::shared_mutex g_audioLifecycleMutex; // shared: Process/SendMidi1, unique: Load/Unload/Terminate
+// Timed mutex so Unload/Terminate can fail with Busy instead of hanging forever
+// when Process is stuck inside a plugin callback.
+std::shared_timed_mutex g_audioLifecycleMutex; // shared: Process/SendMidi1, unique: Load/Unload/Terminate
 HostState g_state;
 std::atomic<VstPluginId> g_nextId{1};
+
+constexpr auto kDestroyWait = std::chrono::milliseconds(2000);
 
 struct ModuleCacheEntry
 {
@@ -348,7 +379,11 @@ std::unordered_map<std::string, ModuleCacheEntry> g_moduleCache;
 std::unordered_map<VstPluginId, std::unique_ptr<PluginInstance>> g_instances;
 
 void destroyInstance(PluginInstance& inst);
-void finishDestroyInstance(std::unique_ptr<PluginInstance> inst);
+/// Wait until borrowers leave, then destroy. On timeout leaves inst intact and returns Busy.
+VstHostResult finishDestroyInstance(std::unique_ptr<PluginInstance>& inst,
+                                    std::chrono::milliseconds timeout = kDestroyWait);
+/// Load-failure path: wait briefly then always destroy (instance was never published).
+void finishDestroyUnpublished(std::unique_ptr<PluginInstance> inst);
 
 std::string normalizeModulePath(const std::string& path)
 {
@@ -392,15 +427,33 @@ void releaseModule(const VST3::Hosting::Module::Ptr& module)
     }
 }
 
-void finishDestroyInstance(std::unique_ptr<PluginInstance> inst)
+void finishDestroyUnpublished(std::unique_ptr<PluginInstance> inst)
 {
     if (!inst)
         return;
+    // Never published → activeProcesses should already be 0; still bound the wait.
+    (void)finishDestroyInstance(inst, kDestroyWait);
+    if (inst)
+    {
+        destroyInstance(*inst);
+        inst.reset();
+    }
+}
+
+VstHostResult finishDestroyInstance(std::unique_ptr<PluginInstance>& inst,
+                                    std::chrono::milliseconds timeout)
+{
+    if (!inst)
+        return kVstHostOk;
 
     // Wait until audio/MIDI borrowers leave. Teardown always runs on this thread
     // (never from OnAudioFilterRead).
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
     for (int spins = 0; inst->activeProcesses.load(std::memory_order_acquire) > 0; ++spins)
     {
+        if (std::chrono::steady_clock::now() >= deadline)
+            return kVstHostErrorBusy;
+
         if (spins < 40)
             std::this_thread::yield();
         else
@@ -408,6 +461,8 @@ void finishDestroyInstance(std::unique_ptr<PluginInstance> inst)
     }
 
     destroyInstance(*inst);
+    inst.reset();
+    return kVstHostOk;
 }
 
 /// Borrow an instance while incrementing activeProcesses under g_mutex.
@@ -753,9 +808,12 @@ VSTHOST_API VstHostResult VstHost_Initialize(int32_t sampleRate, int32_t blockSi
 VSTHOST_API VstHostResult VstHost_Terminate()
 {
     // Block audio/MIDI borrowers before tearing down instances or FreeLibrary.
-    std::unique_lock audioLock(g_audioLifecycleMutex);
+    // Time out instead of hanging forever if a plugin process() never returns.
+    std::unique_lock<std::shared_timed_mutex> audioLock(g_audioLifecycleMutex, std::defer_lock);
+    if (!audioLock.try_lock_for(kDestroyWait))
+        return kVstHostErrorBusy;
 
-    std::vector<std::unique_ptr<PluginInstance>> pending;
+    std::vector<std::pair<VstPluginId, std::unique_ptr<PluginInstance>>> pending;
     {
         std::lock_guard lock(g_mutex);
         if (!g_state.initialized)
@@ -763,12 +821,27 @@ VSTHOST_API VstHostResult VstHost_Terminate()
 
         pending.reserve(g_instances.size());
         for (auto& [id, inst] : g_instances)
-            pending.push_back(std::move(inst));
+            pending.emplace_back(id, std::move(inst));
         g_instances.clear();
     }
 
-    for (auto& inst : pending)
-        finishDestroyInstance(std::move(inst));
+    for (auto& [id, inst] : pending)
+    {
+        const auto result = finishDestroyInstance(inst, kDestroyWait);
+        if (result == kVstHostErrorBusy)
+        {
+            // Put survivors back; leave host initialized so a later Terminate can retry.
+            std::lock_guard lock(g_mutex);
+            if (inst)
+                g_instances[id] = std::move(inst);
+            for (auto& [restId, restInst] : pending)
+            {
+                if (restInst)
+                    g_instances[restId] = std::move(restInst);
+            }
+            return kVstHostErrorBusy;
+        }
+    }
 
     {
         std::lock_guard lock(g_mutex);
@@ -905,14 +978,14 @@ VSTHOST_API VstHostResult VstHost_Load(const char16_t* filePath,
 
     if (!setupControllerAndConnect(*inst, factory))
     {
-        finishDestroyInstance(std::move(inst));
+        finishDestroyUnpublished(std::move(inst));
         return kVstHostErrorLoadFailed;
     }
 
     inst->processor = Steinberg::FUnknownPtr<Steinberg::Vst::IAudioProcessor>(inst->component);
     if (!inst->processor)
     {
-        finishDestroyInstance(std::move(inst));
+        finishDestroyUnpublished(std::move(inst));
         return kVstHostErrorLoadFailed;
     }
 
@@ -924,7 +997,7 @@ VSTHOST_API VstHostResult VstHost_Load(const char16_t* filePath,
 
     if (inst->processor->setupProcessing(setup) != Steinberg::kResultOk)
     {
-        finishDestroyInstance(std::move(inst));
+        finishDestroyUnpublished(std::move(inst));
         return kVstHostErrorLoadFailed;
     }
 
@@ -980,7 +1053,7 @@ VSTHOST_API VstHostResult VstHost_Load(const char16_t* filePath,
     // data are fully wired. Treat setProcessing failure as soft.
     if (inst->component->setActive(true) != Steinberg::kResultOk)
     {
-        finishDestroyInstance(std::move(inst));
+        finishDestroyUnpublished(std::move(inst));
         return kVstHostErrorLoadFailed;
     }
     inst->active = true;
@@ -991,7 +1064,7 @@ VSTHOST_API VstHostResult VstHost_Load(const char16_t* filePath,
 
     if (!prepareAudioProcess(*inst))
     {
-        finishDestroyInstance(std::move(inst));
+        finishDestroyUnpublished(std::move(inst));
         return kVstHostErrorLoadFailed;
     }
 
@@ -1008,8 +1081,10 @@ VSTHOST_API VstHostResult VstHost_Load(const char16_t* filePath,
 
 VSTHOST_API VstHostResult VstHost_Unload(VstPluginId id)
 {
-    // Wait until no Process/SendMidi1 is using any instance, then destroy.
-    std::unique_lock audioLock(g_audioLifecycleMutex);
+    // Time out instead of hanging forever if a plugin process() never returns.
+    std::unique_lock<std::shared_timed_mutex> audioLock(g_audioLifecycleMutex, std::defer_lock);
+    if (!audioLock.try_lock_for(kDestroyWait))
+        return kVstHostErrorBusy;
 
     std::unique_ptr<PluginInstance> doomed;
     {
@@ -1025,12 +1100,20 @@ VSTHOST_API VstHostResult VstHost_Unload(VstPluginId id)
         g_instances.erase(it);
     }
 
-    finishDestroyInstance(std::move(doomed));
+    const auto result = finishDestroyInstance(doomed, kDestroyWait);
+    if (result == kVstHostErrorBusy)
+    {
+        // Keep the instance alive so a later Unload / Terminate can retry.
+        std::lock_guard lock(g_mutex);
+        if (doomed)
+            g_instances[id] = std::move(doomed);
+        return kVstHostErrorBusy;
+    }
     return kVstHostOk;
 }
 
 // ---------------------------------------------------------------------------
-// MIDI (lock-free queue) / Audio
+// MIDI (MPSC-safe queue via push mutex) / Audio
 // ---------------------------------------------------------------------------
 
 VSTHOST_API VstHostResult VstHost_SendMidi1(VstPluginId id,
@@ -1043,14 +1126,9 @@ VSTHOST_API VstHostResult VstHost_SendMidi1(VstPluginId id,
     if (!borrow)
         return g_state.initialized ? kVstHostErrorInvalidId : kVstHostErrorNotInitialized;
 
-    if (!borrow->midiQueue.tryPush(status, data1, data2))
-    {
-        // Queue full: drop oldest then retry once (prefer live notes).
-        Midi1Message discarded{};
-        borrow->midiQueue.tryPop(discarded);
-        if (!borrow->midiQueue.tryPush(status, data1, data2))
-            return kVstHostErrorInvalidArgument;
-    }
+    // push + drop-oldest + retry are atomic w.r.t. other producers / drain.
+    if (!borrow->midiQueue.pushDropOldest(status, data1, data2))
+        return kVstHostErrorInvalidArgument;
     return kVstHostOk;
 }
 

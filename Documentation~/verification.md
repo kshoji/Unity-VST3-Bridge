@@ -15,13 +15,25 @@
 2. Import sample **VST3 Host Sample**.
 3. Open `VstHostSampleScene`, Enter Play Mode.
 4. Confirm scan lists plugins, Load succeeds, **Note On** produces audio.
-5. Confirm `Assets/MIDI` is **not** required.
+5. Optional chain check: switch to **Plugin Chain**, pick Instrument + Effect, **Build Chain**, **Note On**, toggle **Bypass effect**.
+6. Optional feature demos (right panel): **Presets** A/B, **Mapping** CC simulation, **Routes** channel→slot.
+7. Confirm `Assets/MIDI` is **not** required.
 
-Expected: instrument sound through `VstHostAudioFilter` / `AudioSource`.
+Expected: instrument sound through `VstHostAudioFilter` / `AudioSource` (or `VstPluginChain` in chain mode).
 
 For load/unload crash investigation, add scripting define **`VSTHOST_DEBUG`**
 (Player Settings) to restore `[VstHost] CreateInstance` / `DestroyInstance` traces.
 Leave it unset for normal use.
+
+### Unknown / commercial plugins
+
+Compatibility with arbitrary commercial `.vst3` plugins is **not guaranteed**
+([limitations.md](limitations.md)). For a plugin you have not used with this host
+before, validate first on **Windows** (where some native faults inside `process`
+may return `ProcessFailed` instead of killing the process), or in a **dedicated
+throwaway Unity project**. On **macOS**, a fatal fault in the plugin can terminate
+the Editor / Player with no recovery — do not assume an SEH-style catch exists.
+Prefer known-good free/SDK samples (e.g. AGain, mda DX10) for day-to-day smoke tests.
 
 ## MIDI + VST (same Unity project)
 
