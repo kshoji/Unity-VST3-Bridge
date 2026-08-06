@@ -1,0 +1,2 @@
+# Shell scripts must use LF so WSL/Linux shebangs work when editing on Windows.
+*.sh text eol=lf

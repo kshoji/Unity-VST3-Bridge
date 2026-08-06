@@ -6,6 +6,7 @@
 - Native bridge present for your Editor OS:
   - **Windows:** `.\native~\windows-vst-host\Build.ps1 -Install`
   - **macOS:** `./native~/macos-vst-host/Build.sh --Install`
+  - **Linux:** `./native~/linux-vst-host/Build.sh --Install` (WSL2 OK for native smoke; use a full Linux desktop for Unity audio verify)
 - Local `.vst3` plugins (do **not** redistribute third-party plugins)
 
 ## VST only (manual notes)
@@ -25,13 +26,20 @@ For load/unload crash investigation, add scripting define **`VSTHOST_DEBUG`**
 (Player Settings) to restore `[VstHost] CreateInstance` / `DestroyInstance` traces.
 Leave it unset for normal use.
 
+### Instrument vs Effect
+
+| Category | Example | How to hear sound |
+|----------|---------|-------------------|
+| **Instrument** | mda DX10, mda Piano | `Mode = Instrument`, then **Note On** |
+| **Effect** | AGain, ADelay | Needs audio **input** (`Mode = Effect` + playing `AudioSource` clip / upstream signal). Note On alone is silent. |
+
 ### Unknown / commercial plugins
 
 Compatibility with arbitrary commercial `.vst3` plugins is **not guaranteed**
 ([limitations.md](limitations.md)). For a plugin you have not used with this host
 before, validate first on **Windows** (where some native faults inside `process`
 may return `ProcessFailed` instead of killing the process), or in a **dedicated
-throwaway Unity project**. On **macOS**, a fatal fault in the plugin can terminate
+throwaway Unity project**. On **macOS** and **Linux**, a fatal fault in the plugin can terminate
 the Editor / Player with no recovery — do not assume an SEH-style catch exists.
 Prefer known-good free/SDK samples (e.g. AGain, mda DX10) for day-to-day smoke tests.
 
@@ -69,7 +77,52 @@ Do **not** place VST scripts under `Assets/MIDI`.
 VSTHOST_SMOKE_FOLDER="$HOME/Library/Audio/Plug-Ins/VST3" ./native~/macos-vst-host/build/bin/VstHostSmokeTest
 ```
 
-Expects AGain / `again.vst3` (or another free sample) installed locally.
+```bash
+# Linux (WSL2 or native)
+./native~/linux-vst-host/Build.sh
+./native~/linux-vst-host/build/bin/VstHostSmokeTest
+# optional explicit folder:
+VSTHOST_SMOKE_FOLDER="$HOME/.vst3" ./native~/linux-vst-host/build/bin/VstHostSmokeTest
+```
+
+Expects AGain / `again.vst3` / `again-sample-accurate.vst3` (or another free
+sample) under `~/.vst3` or the SDK default paths. For instrument coverage in
+the same smoke binary, also install SDK `mda-vst3` (see below).
+
+### Linux SDK samples (no VSTGUI)
+
+From the repository root (WSL2 or native Linux):
+
+```bash
+cmake -S native~/windows-vst-host/vst3sdk -B /tmp/vst3sdk-build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DSMTG_ENABLE_VSTGUI_SUPPORT=OFF \
+  -DSMTG_ENABLE_VST3_HOSTING_EXAMPLES=OFF
+cmake --build /tmp/vst3sdk-build --target again-sample-accurate --parallel
+cmake --build /tmp/vst3sdk-build --target mda-vst3 --parallel
+mkdir -p ~/.vst3
+cp -a /tmp/vst3sdk-build/VST3/Release/again-sample-accurate.vst3 ~/.vst3/
+cp -a /tmp/vst3sdk-build/VST3/Release/mda-vst3.vst3 ~/.vst3/
+```
+
+Confirm `~/.vst3/mda-vst3.vst3/Contents/x86_64-linux/mda-vst3.so` exists (an
+empty bundle shell without the `.so` will scan as missing plugins).
+
+## Linux Editor (Unity audio)
+
+Recommended workflow for **1.2.0**:
+
+1. **Build** `VstHostNative.so` on WSL2 (`./native~/linux-vst-host/Build.sh --Install`).
+2. Run native **smoke** on WSL2 (optional but fast).
+3. Copy the package (or shared folder) plus `~/.vst3/*.vst3` onto a **full Linux
+   desktop** (VirtualBox Ubuntu, dual-boot, etc.). WSL2 alone is a weak Unity
+   audio / GPU environment.
+4. Open the sample scene in **Unity Linux Editor**.
+5. Load **mda DX10** (`Instrument`), Enter Play Mode, **Note On** — expect synth audio.
+6. Optional: **Plugin Chain** with Instrument + Effect, **Build Chain**, Note On,
+   toggle Bypass.
+
+Verified path for 1.2.0: Ubuntu under VirtualBox, mda DX10 Note On + Plugin Chain.
 
 ## IL2CPP Standalone Windows x64
 
@@ -87,6 +140,16 @@ Manual: menu **Window → VST3 Host → Build IL2CPP Win64 (Verify)**. Asserts `
 2. Menu **Window → VST3 Host → Build Standalone OSX (Verify)** (Mono backend).
 3. Confirm the player contains `VstHostNative.bundle`.
 
+## Standalone Linux64
+
+1. Menu **Window → VST3 Host → Verify Plugin Platforms** (includes Linux `.so` flags).
+2. Menu **Window → VST3 Host → Build Standalone Linux64 (Verify)** (IL2CPP).
+3. Confirm the player contains `VstHostNative.so`.
+
+Prefer a full Linux desktop (VirtualBox / dual-boot) over WSL2 for Player and
+Editor audio checks. Plugin platform flags alone do not replace the manual
+Linux Editor steps above.
+
 When linking the repo via `file:` / Git, `native~/**/build*` outputs may appear — use **Window → VST3 Host → Sanitize Extra Native Plugins**.
 
 ## MIDI-only build must not contain VST
@@ -99,4 +162,4 @@ When linking the repo via `file:` / Git, `native~/**/build*` outputs may appear 
 ./native~/macos-vst-host/Verify-MidiIsolation.sh "<Unity-MIDI-Plugin>"
 ```
 
-Fails if `VstHostNative` (`.dll` / `.bundle` / `.dylib`), VST3 SDK trees, or VST Runtime scripts appear under the MIDI repo `Assets` / `native` / `Packages` (markdown docs are allowed).
+Fails if `VstHostNative` (`.dll` / `.bundle` / `.dylib` / `.so`), VST3 SDK trees, or VST Runtime scripts appear under the MIDI repo `Assets` / `native` / `Packages` (markdown docs are allowed).

@@ -191,6 +191,23 @@ int main()
     }
     printf("SendMidi1 NoteOn/NoteOff ok\n");
 
+    // Apply controller defaults before the first energy check. Some SDK samples
+    // (e.g. AGain Sample Accurate) keep processor params at 0 until a change is
+    // transferred, even when ParameterInfo.defaultNormalized is 1.
+    {
+        int32_t warmCount = 0;
+        if (VstHost_GetParameterCount(id, &warmCount) == kVstHostOk)
+        {
+            for (int32_t i = 0; i < warmCount; ++i)
+            {
+                VstParamInfo warmInfo{};
+                if (VstHost_GetParameterInfo(id, i, &warmInfo) != kVstHostOk)
+                    continue;
+                (void)VstHost_SetParameterNormalized(id, warmInfo.id, warmInfo.defaultNormalized);
+            }
+        }
+    }
+
     // Process AGain (effect) with a sine input
     constexpr int kFrames = 512;
     std::vector<float> inL(kFrames), inR(kFrames), outL(kFrames), outR(kFrames);
@@ -200,7 +217,9 @@ int main()
         inL[i] = s;
         inR[i] = s;
     }
-    if (VstHost_Process(id, inL.data(), inR.data(), outL.data(), outR.data(), kFrames) != kVstHostOk)
+    // Flush queued defaults, then measure a second block.
+    if (VstHost_Process(id, inL.data(), inR.data(), outL.data(), outR.data(), kFrames) != kVstHostOk
+        || VstHost_Process(id, inL.data(), inR.data(), outL.data(), outR.data(), kFrames) != kVstHostOk)
     {
         printf("FAIL: Process (AGain)\n");
         VstHost_Unload(id);

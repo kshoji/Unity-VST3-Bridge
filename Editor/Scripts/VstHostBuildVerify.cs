@@ -9,15 +9,17 @@ using UnityEngine;
 namespace jp.kshoji.unity.vst3nativehost.Editor
 {
     /// <summary>
-    /// Plugin platform flags + optional Standalone verify builds (Win64 IL2CPP / OSX).
+    /// Plugin platform flags + optional Standalone verify builds (Win64 IL2CPP / OSX / Linux64).
     /// Batchmode Win64: -executeMethod jp.kshoji.unity.vst3nativehost.Editor.VstHostBuildVerify.BuildIl2CppWin64
     /// Batchmode OSX: -executeMethod jp.kshoji.unity.vst3nativehost.Editor.VstHostBuildVerify.BuildStandaloneOSX
+    /// Batchmode Linux: -executeMethod jp.kshoji.unity.vst3nativehost.Editor.VstHostBuildVerify.BuildStandaloneLinux64
     /// </summary>
     public static class VstHostBuildVerify
     {
         private const string DllRelativeX64 = "Plugins/Windows/x86_64/VstHostNative.dll";
         private const string DllRelativeArm64 = "Plugins/Windows/ARM64/VstHostNative.dll";
         private const string BundleRelativeMac = "Plugins/macOS/VstHostNative.bundle";
+        private const string SoRelativeLinux = "Plugins/Linux/x86_64/VstHostNative.so";
 
         [MenuItem("Window/VST3 Host/Verify Plugin Platforms")]
         public static void VerifyPluginPlatformsMenu()
@@ -44,6 +46,14 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
                 throw new BuildFailedException($"Standalone OSX verify build failed with code {code}");
         }
 
+        [MenuItem("Window/VST3 Host/Build Standalone Linux64 (Verify)")]
+        public static void BuildStandaloneLinux64Menu()
+        {
+            var code = BuildStandaloneLinux64Internal();
+            if (code != 0)
+                throw new BuildFailedException($"Standalone Linux64 verify build failed with code {code}");
+        }
+
         public static void BuildIl2CppWin64()
         {
             var code = BuildIl2CppWin64Internal();
@@ -53,6 +63,12 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
         public static void BuildStandaloneOSX()
         {
             var code = BuildStandaloneOSXInternal();
+            EditorApplication.Exit(code);
+        }
+
+        public static void BuildStandaloneLinux64()
+        {
+            var code = BuildStandaloneLinux64Internal();
             EditorApplication.Exit(code);
         }
 
@@ -168,6 +184,61 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
             return 0;
         }
 
+        private static int BuildStandaloneLinux64Internal()
+        {
+            if (!VerifyPluginPlatforms(out var pluginMsg))
+            {
+                Debug.LogError($"[VstHost] {pluginMsg}");
+                return 2;
+            }
+
+            Debug.Log($"[VstHost] {pluginMsg}");
+
+            EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Standalone, BuildTarget.StandaloneLinux64);
+            PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone, ScriptingImplementation.IL2CPP);
+
+            var scene = FindFirstEnabledScene();
+            if (string.IsNullOrEmpty(scene))
+            {
+                Debug.LogError("[VstHost] No enabled scene in Build Settings.");
+                return 3;
+            }
+
+            EditorBuildSettings.scenes = new[]
+            {
+                new EditorBuildSettingsScene(scene, true)
+            };
+
+            var outDir = Path.Combine(Directory.GetParent(Application.dataPath)!.FullName, "Builds", "Linux64-Verify");
+            Directory.CreateDirectory(outDir);
+            var exe = Path.Combine(outDir, "VstHostVerify.x86_64");
+
+            var options = new BuildPlayerOptions
+            {
+                scenes = new[] { scene },
+                locationPathName = exe,
+                target = BuildTarget.StandaloneLinux64,
+                options = BuildOptions.None
+            };
+
+            var report = BuildPipeline.BuildPlayer(options);
+            if (report.summary.result != BuildResult.Succeeded)
+            {
+                Debug.LogError($"[VstHost] Build failed: {report.summary.result}");
+                return 4;
+            }
+
+            var soHits = Directory.GetFiles(outDir, "VstHostNative.so", SearchOption.AllDirectories);
+            if (soHits.Length == 0)
+            {
+                Debug.LogError("[VstHost] Built player is missing VstHostNative.so");
+                return 5;
+            }
+
+            Debug.Log($"[VstHost] Standalone Linux64 verify OK. SO: {soHits[0]}");
+            return 0;
+        }
+
         public static bool VerifyPluginPlatforms(out string message)
         {
             if (!TryResolvePluginAssetPath(DllRelativeX64, out var x64Path))
@@ -197,8 +268,17 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
             if (!VerifyMacImporter(macPath, out message))
                 return false;
 
+            if (!TryResolvePluginAssetPath(SoRelativeLinux, out var linuxPath))
+            {
+                message = $"Could not locate {SoRelativeLinux} in the package.";
+                return false;
+            }
+
+            if (!VerifyLinuxImporter(linuxPath, out message))
+                return false;
+
             message =
-                $"{x64Path}: Editor + Win64 OK; {arm64Path}: Windows ARM64 OK; {macPath}: Editor OSX + OSXUniversal OK.";
+                $"{x64Path}: Editor + Win64 OK; {arm64Path}: Windows ARM64 OK; {macPath}: Editor OSX + OSXUniversal OK; {linuxPath}: Editor Linux + Linux64 OK.";
             return true;
         }
 
@@ -249,6 +329,7 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
             var win64Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows64);
             var win32Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows);
             var osxOk = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneOSX);
+            var linuxOk = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneLinux64);
             var arm64Ok = IsWindowsArm64Compatible(importer);
             var anyOk = importer.GetCompatibleWithAnyPlatform();
 
@@ -264,9 +345,9 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
                 return false;
             }
 
-            if (win32Ok || osxOk || arm64Ok)
+            if (win32Ok || osxOk || linuxOk || arm64Ok)
             {
-                message = $"{dllAssetPath}: disable Win32 / OSX / Windows ARM64 (x86_64 Editor+Win64 only).";
+                message = $"{dllAssetPath}: disable Win32 / OSX / Linux / Windows ARM64 (x86_64 Editor+Win64 only).";
                 return false;
             }
 
@@ -288,6 +369,7 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
             var win64Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows64);
             var win32Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows);
             var osxOk = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneOSX);
+            var linuxOk = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneLinux64);
             var arm64Ok = IsWindowsArm64Compatible(importer);
 
             if (anyOk)
@@ -302,10 +384,10 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
                 return false;
             }
 
-            if (editorOk || win64Ok || win32Ok || osxOk)
+            if (editorOk || win64Ok || win32Ok || osxOk || linuxOk)
             {
                 message =
-                    $"{dllAssetPath}: disable Editor/Win64/Win32/OSX (Standalone Windows ARM64 only; editorOk={editorOk}, win64Ok={win64Ok}).";
+                    $"{dllAssetPath}: disable Editor/Win64/Win32/OSX/Linux (Standalone Windows ARM64 only; editorOk={editorOk}, win64Ok={win64Ok}).";
                 return false;
             }
 
@@ -327,6 +409,7 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
             var osxOk = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneOSX);
             var win64Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows64);
             var win32Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows);
+            var linuxOk = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneLinux64);
             var arm64Ok = IsWindowsArm64Compatible(importer);
 
             if (anyOk)
@@ -341,13 +424,52 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
                 return false;
             }
 
-            if (win64Ok || win32Ok || arm64Ok)
+            if (win64Ok || win32Ok || linuxOk || arm64Ok)
             {
-                message = $"{bundleAssetPath}: Windows platforms must stay disabled.";
+                message = $"{bundleAssetPath}: Windows/Linux platforms must stay disabled.";
                 return false;
             }
 
             message = $"{bundleAssetPath}: platforms OK (Editor OSX + OSXUniversal).";
+            return true;
+        }
+
+        private static bool VerifyLinuxImporter(string soAssetPath, out string message)
+        {
+            var importer = AssetImporter.GetAtPath(soAssetPath) as PluginImporter;
+            if (importer == null)
+            {
+                message = $"PluginImporter missing for {soAssetPath}";
+                return false;
+            }
+
+            var anyOk = importer.GetCompatibleWithAnyPlatform();
+            var editorOk = importer.GetCompatibleWithEditor();
+            var linuxOk = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneLinux64);
+            var win64Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows64);
+            var win32Ok = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows);
+            var osxOk = importer.GetCompatibleWithPlatform(BuildTarget.StandaloneOSX);
+            var arm64Ok = IsWindowsArm64Compatible(importer);
+
+            if (anyOk)
+            {
+                message = $"{soAssetPath}: must not be Compatible With Any Platform (Linux only).";
+                return false;
+            }
+
+            if (!editorOk || !linuxOk)
+            {
+                message = $"{soAssetPath}: enable Editor (OS=Linux) + StandaloneLinux64 (editorOk={editorOk}, linuxOk={linuxOk}).";
+                return false;
+            }
+
+            if (win64Ok || win32Ok || osxOk || arm64Ok)
+            {
+                message = $"{soAssetPath}: Windows/OSX platforms must stay disabled.";
+                return false;
+            }
+
+            message = $"{soAssetPath}: platforms OK (Editor Linux + Linux64).";
             return true;
         }
 

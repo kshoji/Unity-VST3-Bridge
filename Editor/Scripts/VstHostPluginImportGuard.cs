@@ -7,8 +7,9 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
     /// <summary>
     /// When the package is linked via <c>file:</c> / Git from the repo root,
     /// <c>native~/**/build*</c> outputs can appear as extra plugins. Keep only
-    /// package <c>Plugins/Windows/.../VstHostNative.dll</c> and
-    /// <c>Plugins/macOS/VstHostNative.bundle</c> enabled.
+    /// package <c>Plugins/Windows/.../VstHostNative.dll</c>,
+    /// <c>Plugins/macOS/VstHostNative.bundle</c>, and
+    /// <c>Plugins/Linux/x86_64/VstHostNative.so</c> enabled.
     /// </summary>
     [InitializeOnLoad]
     static class VstHostPluginImportGuard
@@ -32,6 +33,8 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
                    || normalizedPath.IndexOf("Plugins/Windows/ARM64/VstHostNative.dll",
                        StringComparison.OrdinalIgnoreCase) >= 0
                    || normalizedPath.IndexOf("Plugins/macOS/VstHostNative.bundle",
+                       StringComparison.OrdinalIgnoreCase) >= 0
+                   || normalizedPath.IndexOf("Plugins/Linux/x86_64/VstHostNative.so",
                        StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
@@ -39,7 +42,8 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
         {
             return path.EndsWith("VstHostNative.dll", StringComparison.OrdinalIgnoreCase)
                    || path.EndsWith("VstHostNative.bundle", StringComparison.OrdinalIgnoreCase)
-                   || path.EndsWith("VstHostNative.dylib", StringComparison.OrdinalIgnoreCase);
+                   || path.EndsWith("VstHostNative.dylib", StringComparison.OrdinalIgnoreCase)
+                   || path.EndsWith("VstHostNative.so", StringComparison.OrdinalIgnoreCase);
         }
 
         static void Sanitize()
@@ -67,6 +71,7 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
                     || importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows64)
                     || importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows)
                     || importer.GetCompatibleWithPlatform(BuildTarget.StandaloneOSX)
+                    || importer.GetCompatibleWithPlatform(BuildTarget.StandaloneLinux64)
                     || IsWindowsArm64Compatible(importer))
                 {
                     importer.SetCompatibleWithAnyPlatform(false);
@@ -74,6 +79,7 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
                     importer.SetCompatibleWithPlatform(BuildTarget.StandaloneWindows64, false);
                     importer.SetCompatibleWithPlatform(BuildTarget.StandaloneWindows, false);
                     importer.SetCompatibleWithPlatform(BuildTarget.StandaloneOSX, false);
+                    importer.SetCompatibleWithPlatform(BuildTarget.StandaloneLinux64, false);
                     TrySetWindowsArm64Compatible(importer, false);
                     importer.SaveAndReimport();
                     Debug.LogWarning($"[VstHost] Disabled non-package plugin import: {path}");

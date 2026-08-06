@@ -24,6 +24,8 @@ Requires native bridge binaries:
   — rebuild with `native~/windows-vst-host/Build.ps1 -Install`
 - macOS: `Plugins/macOS/VstHostNative.bundle` (Universal)
   — rebuild with `native~/macos-vst-host/Build.sh --Install`
+- Linux: `Plugins/Linux/x86_64/VstHostNative.so`
+  — rebuild with `native~/linux-vst-host/Build.sh --Install`
 
 ## Scan paths
 
@@ -34,6 +36,7 @@ uses the VST3 SDK’s `Module::getModulePaths()` for the **current OS**:
 |----|-------------------|
 | Windows | `C:\Program Files\Common Files\VST3`; `%LOCALAPPDATA%\Programs\Common\VST3`; `<host>\VST3` |
 | macOS | `~/Library/Audio/Plug-Ins/VST3`; `/Library/Audio/Plug-Ins/VST3`; app-local `VST3` |
+| Linux | `~/.vst3`; `/usr/lib/vst3`; `/usr/local/lib/vst3`; app-local `vst3` |
 
 `GetDefaultScanFolders()` mirrors those paths in C# for UI / tooling. You can
 also pass an explicit folder path to scan only that tree (bundle and flat
@@ -59,6 +62,10 @@ filter.Mode = VstHostAudioFilter.ProcessMode.Instrument;
 
 host.NoteOn(id, channel: 0, note: 60, velocity: 100);
 ```
+
+Use an **Instrument** class for Note On (e.g. SDK **mda DX10**). Effects like
+AGain need a playing audio input with `Mode = Effect`. See
+[verification.md](verification.md) (Instrument vs Effect).
 
 Audio path: native `process` from `OnAudioFilterRead`. Details:
 [audio-path.md](audio-path.md).

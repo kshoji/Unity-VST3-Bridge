@@ -1,6 +1,6 @@
 # VST3 Host Sample
 
-Editor / Standalone sample for **Unity Plugin Host for VST3** (Windows + macOS).
+Editor / Standalone sample for **Unity Plugin Host for VST3** (Windows + macOS + Linux).
 
 ## Import
 
@@ -10,13 +10,16 @@ Open `Scenes/VstHostSampleScene`.
 
 ## Requirements
 
-- Windows (x64 Editor / Win64 or Windows ARM64 player) **or** macOS (Editor OSX / OSXUniversal)
+- Windows (x64 Editor / Win64 or Windows ARM64 player), **or** macOS (Editor OSX /
+  OSXUniversal), **or** Linux (Editor Linux / Standalone Linux64)
 - At least one `.vst3` under the OS-standard VST3 folders
   - Windows: e.g. `C:\Program Files\Common Files\VST3`
   - macOS: e.g. `~/Library/Audio/Plug-Ins/VST3`
+  - Linux: e.g. `~/.vst3` (prefer an **Instrument** such as SDK **mda DX10** for Note On)
 - Native bridge already under `Plugins/` (rebuild if needed):
   - Windows: `native~/windows-vst-host/Build.ps1 -Install`
   - macOS: `native~/macos-vst-host/Build.sh --Install`
+  - Linux: `native~/linux-vst-host/Build.sh --Install`
 
 Unity MIDI Plugin is **optional**. The sample runs VST-only with manual notes.
 
