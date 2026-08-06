@@ -1,0 +1,6 @@
+# Keep directory in git; allow committed .so and PluginImporter metas.
+*
+!.gitignore
+!README.md
+!*.so
+!*.meta
