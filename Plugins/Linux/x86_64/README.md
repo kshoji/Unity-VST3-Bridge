@@ -35,4 +35,6 @@ rewritten `.meta` if it differs slightly by Editor version.
 ## Related
 
 - Native sources: `native~/linux-vst-host/`
-- Package docs: [Documentation~/usage.md](../../../Documentation~/usage.md)
+- Package docs: [Documentation~/usage.md](../../../Documentation~/usage.md),
+  [Documentation~/verification.md](../../../Documentation~/verification.md)
+  (Linux Editor / WSL2 workflow)

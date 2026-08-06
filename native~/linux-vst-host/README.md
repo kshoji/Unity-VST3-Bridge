@@ -57,6 +57,15 @@ mkdir -p ~/.vst3
 cp -a /tmp/vst3sdk-build/VST3/Release/again-sample-accurate.vst3 ~/.vst3/
 ```
 
+For **Unity Editor audio** (Note On), build SDK **mda-vst3** (includes **mda DX10**
+and other instruments). Effects alone stay silent without an audio input:
+
+```bash
+cmake --build /tmp/vst3sdk-build --target mda-vst3 --parallel
+cp -a /tmp/vst3sdk-build/VST3/Release/mda-vst3.vst3 ~/.vst3/
+# Confirm Contents/x86_64-linux/mda-vst3.so exists before copying to a VM
+```
+
 Classic `again` (with SideChain) needs `SMTG_ENABLE_VSTGUI_SUPPORT=ON` and Linux
 GUI deps (cairo / X11 / gtkmm).
 
@@ -71,9 +80,15 @@ GUI deps (cairo / X11 / gtkmm).
 
 ## WSL2 vs full Linux VM
 
-WSL2 is enough to **build** `.so` and run the native smoke test. Use a real
-Linux desktop (e.g. VirtualBox Ubuntu) or CI for Unity Editor / Player audio
-verification.
+| Step | Environment |
+|------|-------------|
+| Build `.so` + native smoke | **WSL2** (or native Linux) |
+| Unity Editor / Player audio (mda DX10, Plugin Chain) | **Full Linux desktop** (e.g. VirtualBox Ubuntu) |
+
+WSL2 is enough to produce `Plugins/Linux/x86_64/VstHostNative.so`. Copy the
+package and `~/.vst3` plugins into the VM for Editor checks. See
+[Documentation~/verification.md](../../Documentation~/verification.md)
+(Linux Editor section).
 
 VST® is a registered trademark of Steinberg Media Technologies GmbH.
 See repository root [NOTICE.md](../../NOTICE.md).

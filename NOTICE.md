@@ -1,7 +1,7 @@
 # NOTICE — Unity Plugin Host for VST3
 
 This package hosts VST3 instruments and effects through a native bridge
-(`VstHostNative` — Windows `.dll` / macOS `.bundle`), with optional integration
+(`VstHostNative` — Windows `.dll` / macOS `.bundle` / Linux `.so`), with optional integration
 to Unity MIDI Plugin.
 
 ## Package license
@@ -43,11 +43,17 @@ cd native~/macos-vst-host
 ./Build.sh --Install
 ```
 
+```bash
+# Linux (same SDK submodule path; WSL2 OK for build):
+cd native~/linux-vst-host
+./Build.sh --Install
+```
+
 UPM / registry packages **do not** include `native~/` (see `.npmignore`).
 Git URL and `file:` installs also skip AssetDatabase import because the folder
 name ends with `~` (see [Documentation~/package-excludes.md](Documentation~/package-excludes.md)).
 End users who only consume the prebuilt `Plugins/.../VstHostNative`
-(`.dll` / `.bundle`) do not need a local SDK checkout. Rebuilders and
+(`.dll` / `.bundle` / `.so`) do not need a local SDK checkout. Rebuilders and
 contributors do.
 
 ### SDK license (summary)
@@ -71,12 +77,13 @@ that license.
 |-------------------------------------|-------------------|
 | Prebuilt `VstHostNative.dll` (Windows) | Full VST3 SDK source tree (`native~/`) |
 | Prebuilt `VstHostNative.bundle` (macOS Universal) | Third-party commercial `.vst3` plugins |
-| Runtime / Editor C# | Sample `.vst3` binaries used only on developer machines |
+| Prebuilt `VstHostNative.so` (Linux x86_64) | Sample `.vst3` binaries used only on developer machines |
+| Runtime / Editor C# | |
 | Documentation under `Documentation~/` | |
 
 ## Distribution boundary (MIDI)
 
-- Do **not** ship the VST3 SDK, `VstHostNative` (`.dll` / `.bundle`), or VST host C# inside
+- Do **not** ship the VST3 SDK, `VstHostNative` (`.dll` / `.bundle` / `.so`), or VST host C# inside
   Unity MIDI Plugin releases.
 - Do **not** place VST host implementation under `Assets/MIDI`.
 - Keep VST host code, native binaries, trademarks notices, and SDK

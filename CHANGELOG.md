@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.2.0
+
+### Added
+- Linux support: `native~/linux-vst-host/` (CMake + `Build.sh`),
+  `Plugins/Linux/x86_64/VstHostNative.so`, Linux scan paths,
+  `VstHostBuildVerify` Standalone Linux64 helper, PluginImporter sanitize for
+  `.so`, and documentation updates.
+- SmokeTest applies controller `defaultNormalized` before the first energy
+  check so SDK samples like AGain Sample Accurate pass without VSTGUI.
+
+### Changed
+- Docs describe a WSL2 (native build / smoke) → full Linux desktop (Unity
+  Editor audio) workflow. Linux Editor was verified with SDK **mda DX10**
+  (Instrument) and **Plugin Chain** on Ubuntu under VirtualBox.
+
 ## 1.1.0
 
 ### Added

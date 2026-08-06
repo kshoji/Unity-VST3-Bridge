@@ -25,6 +25,7 @@ https://github.com/kshoji/Unity-VST3-Bridge.git
 - `Plugins/Windows/x86_64/` — native bridge DLL (Editor + Standalone Win64)
 - `Plugins/Windows/ARM64/` — native bridge DLL (Standalone Windows ARM64)
 - `Plugins/macOS/` — native bridge `.bundle` (Editor OSX + Standalone OSXUniversal)
+- `Plugins/Linux/x86_64/` — native bridge `.so` (Editor Linux + Standalone Linux64)
 - `Samples~/` — importable samples
 - `Documentation~/` — package documentation (usage, verification, limitations, etc.)
 - `Tests/` — optional package tests
@@ -33,6 +34,7 @@ https://github.com/kshoji/Unity-VST3-Bridge.git
   - Also listed in `.npmignore` for registry publishes
   - `native~/windows-vst-host/` — Windows DLL
   - `native~/macos-vst-host/` — macOS bundle (shares SDK submodule under windows tree)
+  - `native~/linux-vst-host/` — Linux `.so` (shares SDK submodule under windows tree)
 
 ## Documentation
 
@@ -52,14 +54,15 @@ https://github.com/kshoji/Unity-VST3-Bridge.git
 
 ## Status
 
-Native host (Windows + macOS), MIDI, audio return, parameters / state / IMGUI panel,
+Native host (Windows + macOS + Linux), MIDI, audio return, parameters / state / IMGUI panel,
 CC→parameter mapping, SMF link, preset assets / browser,
 Timeline (`FEATURE_USE_TIMELINE`) / Input System (`FEATURE_INPUT_SYSTEM`) /
 Visual Scripting / Animator bridges, plugin chain + channel route sync,
 editor tools (Plugin Browser vendor/tag, Activity Monitor),
 sample scene with Presets / Mapping / Routes demos (VST-only capable),
-IL2CPP Win64 / Standalone OSX verify helpers, and documentation /
-trademark / SDK notices are included.
+IL2CPP Win64 / Standalone OSX / Linux64 verify helpers, and documentation /
+trademark / SDK notices are included. Linux Editor audio verified with SDK
+mda DX10 + Plugin Chain (see [Documentation~/verification.md](Documentation~/verification.md)).
 
 Import **VST3 Host Sample** from Package Manager, or follow [Documentation~/verification.md](Documentation~/verification.md).
 
@@ -83,7 +86,8 @@ host.NoteOn(id, 0, 60, 100);
 ## Scan paths
 
 Empty/`null` scan uses OS-standard VST3 locations via the SDK
-(Windows Common Files / macOS Library folders, plus app-local `VST3`).
+(Windows Common Files / macOS Library folders / Linux `~/.vst3` and
+`/usr[/local]/lib/vst3`, plus app-local `VST3`/`vst3`).
 Pass a folder path to scan a custom tree. Details: [Documentation~/usage.md](Documentation~/usage.md).
 
 ## Optional MIDI Plugin integration
@@ -123,8 +127,16 @@ cd native~/macos-vst-host
 ./Build.sh --Install
 ```
 
+```bash
+# Linux (WSL2 or native)
+git submodule update --init --recursive -- native~/windows-vst-host/vst3sdk
+cd native~/linux-vst-host
+./Build.sh --Install
+```
+
 See [native~/windows-vst-host/README.md](native~/windows-vst-host/README.md),
-[native~/macos-vst-host/README.md](native~/macos-vst-host/README.md), and
+[native~/macos-vst-host/README.md](native~/macos-vst-host/README.md),
+[native~/linux-vst-host/README.md](native~/linux-vst-host/README.md), and
 [NOTICE.md](NOTICE.md). Prebuilt binaries under `Plugins/` are enough for normal UPM use.
 
 ## Debug tracing (load / lifecycle)
@@ -136,7 +148,7 @@ Define Symbols). Errors and warnings remain always on.
 
 ## Known limitations (summary)
 
-VST3 only · Windows + macOS · no plugin-native GUI (not planned) · MIDI 2.0
+VST3 only · Windows + macOS + Linux · no plugin-native GUI (not planned) · MIDI 2.0
 down-convert · commercial plugin compatibility not guaranteed · no third-party
 `.vst3` in the package. Full list:
 [Documentation~/limitations.md](Documentation~/limitations.md).
