@@ -70,12 +70,25 @@ VSTHOST_API VstHostResult VstHost_SendMidi1(VstPluginId id,
                                             uint8_t data2);
 
 // --- Audio ---
+// Main L/R only; other audio input buses (e.g. Aux/sidechain) stay silent scratch.
 VSTHOST_API VstHostResult VstHost_Process(VstPluginId id,
                                           const float* inputL,
                                           const float* inputR,
                                           float* outputL,
                                           float* outputR,
                                           int32_t numFrames);
+
+// Same as Process, but feeds the first Aux / second audio input bus from sidechain L/R.
+// Mono Aux: L is duplicated to both channels when sidechainR is null.
+// Pass sidechainL/R as null to behave like Process (silent Aux).
+VSTHOST_API VstHostResult VstHost_ProcessWithSidechain(VstPluginId id,
+                                                       const float* inputL,
+                                                       const float* inputR,
+                                                       const float* sidechainL,
+                                                       const float* sidechainR,
+                                                       float* outputL,
+                                                       float* outputR,
+                                                       int32_t numFrames);
 
 // --- Parameters ---
 VSTHOST_API VstHostResult VstHost_GetParameterCount(VstPluginId id, int32_t* outCount);

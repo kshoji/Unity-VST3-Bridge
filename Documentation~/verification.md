@@ -89,6 +89,28 @@ Expects AGain / `again.vst3` / `again-sample-accurate.vst3` (or another free
 sample) under `~/.vst3` or the SDK default paths. For instrument coverage in
 the same smoke binary, also install SDK `mda-vst3` (see below).
 
+### Sidechain Process (AGain SideChain)
+
+Native ABI `VstHost_ProcessWithSidechain` feeds the plugin’s second audio input
+bus (typically `kAux`) with real L/R planar buffers. Existing `VstHost_Process`
+keeps Aux silent (crash-safe binding unchanged).
+
+**Manual / smoke check** (requires classic SDK `again.vst3` with **AGain SideChain**
+in the name — not `again-sample-accurate` alone):
+
+1. Rebuild the native bridge (`Build.ps1` / `Build.sh`) and run `VstHostSmokeTest`.
+2. Expect log lines similar to:
+   - `Process AGain SideChain ok` (silent-Aux regression still passes)
+   - `ProcessWithSidechain AGain SideChain energy silentAux=… withSc=…`
+   - `withSc` energy must be **greater** than `silentAux` (AGain SideChain adds aux into the output)
+3. If SideChain is missing: `WARN: AGain SideChain not found; skipped` (smoke still OK).
+4. Unity / C#: `VstHostManager.ProcessWithSidechain(...)` mirrors the native call.
+   Plugins without an Aux bus ignore the sidechain buffers (main-only process).
+
+On Linux, classic `again` (with SideChain) needs VSTGUI; see
+[linux-vst-host README](../native~/linux-vst-host/README.md). Windows / macOS SDK
+builds with VSTGUI typically include SideChain.
+
 ### Linux SDK samples (no VSTGUI)
 
 From the repository root (WSL2 or native Linux):

@@ -1173,6 +1173,19 @@ VSTHOST_API VstHostResult VstHost_Process(VstPluginId id,
                                           float* outputR,
                                           int32_t numFrames)
 {
+    return VstHost_ProcessWithSidechain(id, inputL, inputR, nullptr, nullptr, outputL, outputR,
+                                        numFrames);
+}
+
+VSTHOST_API VstHostResult VstHost_ProcessWithSidechain(VstPluginId id,
+                                                       const float* inputL,
+                                                       const float* inputR,
+                                                       const float* sidechainL,
+                                                       const float* sidechainR,
+                                                       float* outputL,
+                                                       float* outputR,
+                                                       int32_t numFrames)
+{
     if (!outputL || !outputR || numFrames <= 0)
         return kVstHostErrorInvalidArgument;
 
@@ -1222,22 +1235,34 @@ VSTHOST_API VstHostResult VstHost_Process(VstPluginId id,
 
     // Bind EVERY audio input bus. Unbound side-chain buses crash many plugins (e.g. AGain SideChain).
     // silenceFlags must equal getChannelMask(n) — plugins compare equality, not bit-subset.
+    // Bus 0 = main. Bus 1 (typically kAux) = optional sidechain when sidechainL != null.
     for (int32_t b = 0; b < inst->processData.numInputs; ++b)
     {
         auto& bus = inst->processData.inputs[b];
         if (!bus.channelBuffers32)
             continue;
+        const bool isMain = (b == 0);
+        const bool isSidechain = (b == 1 && sidechainL != nullptr);
         for (int32_t c = 0; c < bus.numChannels; ++c)
         {
-            if (b == 0 && c == 0 && inputL)
+            if (isMain && c == 0 && inputL)
                 bus.channelBuffers32[c] = const_cast<float*>(inputL);
-            else if (b == 0 && c == 1 && (inputR || inputL))
+            else if (isMain && c == 1 && (inputR || inputL))
                 bus.channelBuffers32[c] = const_cast<float*>(inputR ? inputR : inputL);
+            else if (isSidechain && c == 0)
+                bus.channelBuffers32[c] = const_cast<float*>(sidechainL);
+            else if (isSidechain && c == 1)
+                bus.channelBuffers32[c] =
+                    const_cast<float*>(sidechainR ? sidechainR : sidechainL);
             else
                 bus.channelBuffers32[c] = nextScratch();
         }
-        const bool mainHasAudio = (b == 0 && inputL != nullptr);
-        bus.silenceFlags = mainHasAudio ? 0 : getChannelMask(bus.numChannels);
+        if (isMain)
+            bus.silenceFlags = (inputL != nullptr) ? 0 : getChannelMask(bus.numChannels);
+        else if (isSidechain)
+            bus.silenceFlags = 0;
+        else
+            bus.silenceFlags = getChannelMask(bus.numChannels);
     }
 
     // Bind EVERY audio output bus; only bus 0 carries host-visible L/R.
