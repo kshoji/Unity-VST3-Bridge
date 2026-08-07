@@ -51,7 +51,8 @@ namespace jp.kshoji.unity.vst3nativehost.Tests
         {
             var asset = ScriptableObject.CreateInstance<VstPresetAsset>();
             Assert.IsFalse(asset.HasState);
-            Assert.IsFalse(string.IsNullOrEmpty(asset.DisplayName));
+            asset.name = "EmptyPreset";
+            Assert.AreEqual("EmptyPreset", asset.DisplayName);
             Object.DestroyImmediate(asset);
         }
 

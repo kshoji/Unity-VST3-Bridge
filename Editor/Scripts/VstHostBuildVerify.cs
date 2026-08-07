@@ -13,6 +13,8 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
     /// Batchmode Win64: -executeMethod jp.kshoji.unity.vst3nativehost.Editor.VstHostBuildVerify.BuildIl2CppWin64
     /// Batchmode OSX: -executeMethod jp.kshoji.unity.vst3nativehost.Editor.VstHostBuildVerify.BuildStandaloneOSX
     /// Batchmode Linux: -executeMethod jp.kshoji.unity.vst3nativehost.Editor.VstHostBuildVerify.BuildStandaloneLinux64
+    /// Batchmode platforms: -executeMethod jp.kshoji.unity.vst3nativehost.Editor.VstHostBuildVerify.VerifyPluginPlatformsExit
+    /// Phase 5 smoke: native~/windows-vst-host/Run-Phase5Verify.ps1
     /// </summary>
     public static class VstHostBuildVerify
     {
@@ -70,6 +72,17 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
         {
             var code = BuildStandaloneLinux64Internal();
             EditorApplication.Exit(code);
+        }
+
+        /// <summary>Batchmode: exit 0 when plugin platform flags are OK.</summary>
+        public static void VerifyPluginPlatformsExit()
+        {
+            var ok = VerifyPluginPlatforms(out var message);
+            if (ok)
+                Debug.Log($"[VstHost] {message}");
+            else
+                Debug.LogError($"[VstHost] {message}");
+            EditorApplication.Exit(ok ? 0 : 2);
         }
 
         private static int BuildIl2CppWin64Internal()
@@ -195,7 +208,6 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
             Debug.Log($"[VstHost] {pluginMsg}");
 
             EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Standalone, BuildTarget.StandaloneLinux64);
-            PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone, ScriptingImplementation.IL2CPP);
 
             var scene = FindFirstEnabledScene();
             if (string.IsNullOrEmpty(scene))
@@ -213,18 +225,41 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
             Directory.CreateDirectory(outDir);
             var exe = Path.Combine(outDir, "VstHostVerify.x86_64");
 
-            var options = new BuildPlayerOptions
+            // Prefer IL2CPP when the Linux sysroot toolchain is present; otherwise Mono
+            // (common when verifying from Windows without com.unity.sysroot.* packages).
+            var backends = new[]
             {
-                scenes = new[] { scene },
-                locationPathName = exe,
-                target = BuildTarget.StandaloneLinux64,
-                options = BuildOptions.None
+                ScriptingImplementation.IL2CPP,
+                ScriptingImplementation.Mono2x
             };
 
-            var report = BuildPipeline.BuildPlayer(options);
-            if (report.summary.result != BuildResult.Succeeded)
+            BuildReport report = null;
+            foreach (var backend in backends)
             {
-                Debug.LogError($"[VstHost] Build failed: {report.summary.result}");
+                PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone, backend);
+                var options = new BuildPlayerOptions
+                {
+                    scenes = new[] { scene },
+                    locationPathName = exe,
+                    target = BuildTarget.StandaloneLinux64,
+                    options = BuildOptions.None
+                };
+
+                report = BuildPipeline.BuildPlayer(options);
+                if (report != null && report.summary.result == BuildResult.Succeeded)
+                {
+                    if (backend != ScriptingImplementation.IL2CPP)
+                        Debug.LogWarning($"[VstHost] Linux64 verify used {backend} (IL2CPP unavailable or failed).");
+                    break;
+                }
+
+                var result = report != null ? report.summary.result.ToString() : "null-report";
+                Debug.LogWarning($"[VstHost] Linux64 build with {backend} failed ({result}); trying next backend.");
+            }
+
+            if (report == null || report.summary.result != BuildResult.Succeeded)
+            {
+                Debug.LogError($"[VstHost] Build failed: {(report != null ? report.summary.result.ToString() : "null report")}");
                 return 4;
             }
 
@@ -475,24 +510,61 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
 
         private static bool IsWindowsArm64Compatible(PluginImporter importer)
         {
-            try
+            foreach (var platformId in new[]
+                     {
+                         "WindowsStandaloneArm64",
+                         "StandaloneWindowsArm64",
+                         "WinArm64"
+                     })
             {
-                if (importer.GetCompatibleWithPlatform("WindowsStandaloneArm64"))
-                    return true;
-            }
-            catch
-            {
-                // Older editors without the platform id — try alternate name.
+                try
+                {
+                    if (importer.GetCompatibleWithPlatform(platformId))
+                        return true;
+                }
+                catch
+                {
+                    // Platform id unknown on this Editor.
+                }
             }
 
-            try
+            // Editors without the Windows ARM64 player module often cannot report the
+            // platform via GetCompatibleWithPlatform. Use package layout + meta flags.
+            var assetPath = AssetDatabase.GetAssetPath(importer)?.Replace('\\', '/') ?? string.Empty;
+            if (assetPath.IndexOf("/Plugins/Windows/ARM64/", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+
+            foreach (var anyKey in new[] { "Any", "" })
             {
-                return importer.GetCompatibleWithPlatform("StandaloneWindowsArm64");
+                try
+                {
+                    var exclude = importer.GetPlatformData(anyKey, "Exclude Windows ARM64");
+                    if (string.Equals(exclude, "0", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(exclude, "false", StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+                catch
+                {
+                    // Ignore missing keys.
+                }
             }
-            catch
+
+            foreach (var armKey in new[] { "Windows ARM64", "WindowsStandaloneArm64", "StandaloneWindowsArm64" })
             {
-                return false;
+                try
+                {
+                    var cpu = importer.GetPlatformData(armKey, "CPU");
+                    if (!string.IsNullOrEmpty(cpu)
+                        && !string.Equals(cpu, "None", StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+                catch
+                {
+                    // Ignore missing keys.
+                }
             }
+
+            return false;
         }
 
         private static string FindFirstEnabledScene()

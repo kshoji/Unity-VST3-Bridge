@@ -232,6 +232,227 @@ namespace jp.kshoji.unity.vst3nativehost.Tests
             }
         }
 
+        [Test]
+        public void BuildParallel_InstrumentOnly_ExpectedNodeCount()
+        {
+            var go = new GameObject("VstAudioGraphTest");
+            try
+            {
+                var graph = go.AddComponent<VstAudioGraph>();
+                Assert.IsTrue(graph.BuildParallelInstrumentsThenSerialEffects(
+                    new[] { 7 }, new int[0], mixExternalInput: false));
+                // Instrument + Mix + Output
+                Assert.AreEqual(3, graph.Nodes.Count);
+                Assert.AreEqual(2, graph.Edges.Count);
+                Assert.IsTrue(graph.HasArmedGraph);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void BuildParallel_EffectOnlyViaExternalIn_ExpectedNodeCount()
+        {
+            var go = new GameObject("VstAudioGraphTest");
+            try
+            {
+                var graph = go.AddComponent<VstAudioGraph>();
+                Assert.IsTrue(graph.BuildParallelInstrumentsThenSerialEffects(
+                    new int[0], new[] { 5, 6 }, mixExternalInput: true));
+                // ExternalIn + Mix + Fx + Fx + Output
+                Assert.AreEqual(5, graph.Nodes.Count);
+                Assert.IsTrue(graph.HasArmedGraph);
+                Assert.AreEqual(VstGraphNodeKind.ExternalIn, graph.Nodes[0].kind);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void BuildParallel_WithoutSource_Fails()
+        {
+            var go = new GameObject("VstAudioGraphTest");
+            try
+            {
+                var graph = go.AddComponent<VstAudioGraph>();
+                Assert.IsFalse(graph.BuildParallelInstrumentsThenSerialEffects(
+                    new int[0], new[] { 1 }, mixExternalInput: false));
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void SetGraph_DiamondDag_ArmsSuccessfully()
+        {
+            // Topological sort must accept a diamond: Split → two Gains → Mix → Output
+            var go = new GameObject("VstAudioGraphTest");
+            try
+            {
+                var graph = go.AddComponent<VstAudioGraph>();
+                Assert.IsTrue(graph.SetGraph(
+                    new[]
+                    {
+                        VstGraphNode.Create(1, VstGraphNodeKind.Instrument, 9),
+                        VstGraphNode.Create(2, VstGraphNodeKind.Split),
+                        VstGraphNode.Create(3, VstGraphNodeKind.Gain, 0, 0.5f),
+                        VstGraphNode.Create(4, VstGraphNodeKind.Gain, 0, 0.5f),
+                        VstGraphNode.Create(5, VstGraphNodeKind.Mix),
+                        VstGraphNode.Create(6, VstGraphNodeKind.Output),
+                    },
+                    new[]
+                    {
+                        VstGraphEdge.Main(1, 2),
+                        VstGraphEdge.Main(2, 3),
+                        VstGraphEdge.Main(2, 4),
+                        VstGraphEdge.Main(3, 5),
+                        VstGraphEdge.Main(4, 5),
+                        VstGraphEdge.Main(5, 6),
+                    }));
+                Assert.IsTrue(graph.HasArmedGraph);
+                Assert.IsTrue(string.IsNullOrEmpty(graph.LastArmError));
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void SetGraph_SidechainOrderingConstraint_Arms()
+        {
+            // Sidechain edge is a topology constraint (kick → effect Aux before process).
+            var go = new GameObject("VstAudioGraphTest");
+            try
+            {
+                var graph = go.AddComponent<VstAudioGraph>();
+                Assert.IsTrue(graph.SetGraph(
+                    new[]
+                    {
+                        VstGraphNode.Create(1, VstGraphNodeKind.Instrument, 1),
+                        VstGraphNode.Create(2, VstGraphNodeKind.Instrument, 2),
+                        VstGraphNode.Create(3, VstGraphNodeKind.Mix),
+                        VstGraphNode.Create(4, VstGraphNodeKind.Effect, 3),
+                        VstGraphNode.Create(5, VstGraphNodeKind.Output),
+                    },
+                    new[]
+                    {
+                        VstGraphEdge.Main(1, 3),
+                        VstGraphEdge.Main(3, 4),
+                        VstGraphEdge.Sidechain(2, 4),
+                        VstGraphEdge.Main(4, 5),
+                    }));
+                Assert.IsTrue(graph.HasArmedGraph);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void SetGraph_ExceedsMaxNodes_FailsAndKeepsPrevious()
+        {
+            var go = new GameObject("VstAudioGraphTest");
+            try
+            {
+                var graph = go.AddComponent<VstAudioGraph>();
+                Assert.IsTrue(graph.BuildParallelInstrumentsThenSerialEffects(new[] { 1 }, new int[0]));
+                Assert.IsTrue(graph.HasArmedGraph);
+
+                var tooMany = new VstGraphNode[VstAudioGraph.MaxNodes + 1];
+                for (var i = 0; i < tooMany.Length; i++)
+                {
+                    if (i == tooMany.Length - 1)
+                        tooMany[i] = VstGraphNode.Create(i + 1, VstGraphNodeKind.Output);
+                    else if (i == 0)
+                        tooMany[i] = VstGraphNode.Create(i + 1, VstGraphNodeKind.Instrument, 1);
+                    else
+                        tooMany[i] = VstGraphNode.Create(i + 1, VstGraphNodeKind.Mix);
+                }
+
+                // Edges: linear chain Instrument → Mix* → Output (invalid Mix inputs for middle,
+                // but MaxNodes check runs first).
+                var edgeList = new List<VstGraphEdge>();
+                for (var i = 0; i < tooMany.Length - 1; i++)
+                    edgeList.Add(VstGraphEdge.Main(i + 1, i + 2));
+
+                Assert.IsFalse(graph.SetGraph(tooMany, edgeList));
+                Assert.IsTrue(graph.HasArmedGraph);
+                StringAssert.Contains("MaxNodes", graph.LastArmError);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void SetGraph_EffectMissingMainInput_Fails()
+        {
+            var go = new GameObject("VstAudioGraphTest");
+            try
+            {
+                var graph = go.AddComponent<VstAudioGraph>();
+                Assert.IsFalse(graph.SetGraph(
+                    new[]
+                    {
+                        VstGraphNode.Create(1, VstGraphNodeKind.Effect, 9),
+                        VstGraphNode.Create(2, VstGraphNodeKind.Output),
+                    },
+                    new[]
+                    {
+                        VstGraphEdge.Main(1, 2),
+                    }));
+                Assert.IsFalse(string.IsNullOrEmpty(graph.LastArmError));
+                StringAssert.Contains("Main input", graph.LastArmError);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void BuildSendReturn_ExpectedNodeCount()
+        {
+            var go = new GameObject("VstAudioGraphTest");
+            try
+            {
+                var graph = go.AddComponent<VstAudioGraph>();
+                Assert.IsTrue(graph.BuildSendReturn(1, 2));
+                Assert.AreEqual(5, graph.Nodes.Count);
+                Assert.AreEqual(5, graph.Edges.Count);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void BuildSidechain_ExpectedNodeCount()
+        {
+            var go = new GameObject("VstAudioGraphTest");
+            try
+            {
+                var graph = go.AddComponent<VstAudioGraph>();
+                Assert.IsTrue(graph.BuildSidechain(1, 2, 3));
+                Assert.AreEqual(5, graph.Nodes.Count);
+                Assert.AreEqual(4, graph.Edges.Count);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
         private static VstGraphNodeKind FindKind(VstAudioGraph graph, int nodeId)
         {
             foreach (var n in graph.Nodes)
