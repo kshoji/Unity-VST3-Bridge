@@ -58,7 +58,7 @@ Native host (Windows + macOS + Linux), MIDI, audio return, parameters / state / 
 CC→parameter mapping, SMF link, preset assets / browser,
 Timeline (`FEATURE_USE_TIMELINE`) / Input System (`FEATURE_INPUT_SYSTEM`) /
 Visual Scripting / Animator bridges, audio graph + channel route sync,
-editor tools (Plugin Browser vendor/tag, Activity Monitor),
+editor tools (Plugin Browser vendor/tag, Activity Monitor, Audio Graph window),
 sample scene with Presets / Mapping / Routes demos (VST-only capable),
 IL2CPP Win64 / Standalone OSX / Linux64 verify helpers, and documentation /
 trademark / SDK notices are included. Linux Editor audio verified with SDK

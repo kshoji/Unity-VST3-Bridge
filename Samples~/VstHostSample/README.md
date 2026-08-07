@@ -47,6 +47,7 @@ Unity MIDI Plugin is **optional**. The sample runs VST-only with manual notes.
 | Sidechain | Prefer effect named **AGain SideChain**. Single instrument feeds main + Aux via `BuildSidechainFromSingleSource`. |
 
 DSP MIDI queue flush is enabled on `VstAudioGraph`. Channel routes: right panel **Routes** tab (node id).
+Topology check: **Window → VST3 Host → Audio Graph** (read-only nodes / edges / arm status).
 
 If the Game view is short, make it taller so Bypass / Note On remain visible.
 

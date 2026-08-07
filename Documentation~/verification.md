@@ -16,11 +16,25 @@
 2. Import sample **VST3 Host Sample**.
 3. Open `VstHostSampleScene`, Enter Play Mode.
 4. Confirm scan lists plugins, Load succeeds, **Note On** produces audio.
-5. Optional graph check: switch to **Audio Graph**, pick Parallel→Serial / Send/Return / Sidechain, **Build Graph**, **Note On**, toggle **Bypass effect** (Sidechain: prefer **AGain SideChain**).
+5. Optional graph check: see **Audio Graph (manual matrix)** below.
 6. Optional feature demos (right panel): **Presets** A/B, **Mapping** CC simulation, **Routes** (Graph instrument node ids).
 7. Confirm `Assets/MIDI` is **not** required.
 
 Expected: instrument sound through `VstHostAudioFilter` / `AudioSource`, or `VstAudioGraph` in multi-plugin mode.
+
+### Audio Graph (manual matrix)
+
+Use sample **Audio Graph** mode. Confirm topology in
+**Window → VST3 Host → Audio Graph** (read-only) after each **Build Graph**.
+
+| Scenario | How | Expect |
+|----------|-----|--------|
+| **Instrument only** | Single mode **Instrument**, or Graph Parallel→Serial with Instrument list only (empty Effect) → Build | Note On audible; Graph window: Inst → Mix → Output |
+| **Effect only** | Single mode **Effect** + playing clip / upstream; or Graph Parallel→Serial with **Mix ExternalIn** + Effect(s), no Instrument | Upstream / ExternalIn heard through Effect |
+| **Parallel → Serial** | Demo **Parallel→Serial**, Inst + Effect → Build → Note On | Mix of instruments into serial FX; Bypass effect restores dry |
+| **Send / Return** | Demo **Send/Return** → Build; move **Send gain** 0→up | Wet rises with send; Split dry/send edges visible in Graph window |
+| **Sidechain** | Demo **Sidechain**, prefer **AGain SideChain** → Build → Note On | Aux edge `toPort=Sidechain` in Graph window; energy differs vs silent Aux (see Sidechain Process below) |
+| **ExternalIn** | Parallel→Serial + **Mix ExternalIn** (or Chunity bridge) | ExternalIn node present; upstream filter input mixed |
 
 For load/unload crash investigation, add scripting define **`VSTHOST_DEBUG`**
 (Player Settings) to restore `[VstHost] CreateInstance` / `DestroyInstance` traces.
@@ -116,15 +130,17 @@ builds with VSTGUI typically include SideChain.
 From the repository root (WSL2 or native Linux):
 
 ```bash
-cmake -S native~/windows-vst-host/vst3sdk -B /tmp/vst3sdk-build \
+BUILD="$HOME/vst3sdk-build"   # persistent under home (prefer over /tmp on WSL2)
+cmake -S native~/windows-vst-host/vst3sdk -B "$BUILD" \
   -DCMAKE_BUILD_TYPE=Release \
   -DSMTG_ENABLE_VSTGUI_SUPPORT=OFF \
   -DSMTG_ENABLE_VST3_HOSTING_EXAMPLES=OFF
-cmake --build /tmp/vst3sdk-build --target again-sample-accurate --parallel
-cmake --build /tmp/vst3sdk-build --target mda-vst3 --parallel
+cmake --build "$BUILD" --target again-sample-accurate --parallel
+cmake --build "$BUILD" --target mda-vst3 --parallel
 mkdir -p ~/.vst3
-cp -a /tmp/vst3sdk-build/VST3/Release/again-sample-accurate.vst3 ~/.vst3/
-cp -a /tmp/vst3sdk-build/VST3/Release/mda-vst3.vst3 ~/.vst3/
+# SMTG may already symlink into ~/.vst3 during the build.
+cp -a "$BUILD/VST3/Release/again-sample-accurate.vst3" ~/.vst3/ 2>/dev/null || true
+cp -a "$BUILD/VST3/Release/mda-vst3.vst3" ~/.vst3/ 2>/dev/null || true
 ```
 
 Confirm `~/.vst3/mda-vst3.vst3/Contents/x86_64-linux/mda-vst3.so` exists (an
@@ -155,7 +171,16 @@ Automated (recommended):
 .\native~\windows-vst-host\Run-Il2CppVerify.ps1
 ```
 
+Phase 5 full smoke (EditMode tests + Win64 IL2CPP + OSX + Linux64 verify builds):
+
+```powershell
+.\native~\windows-vst-host\Run-Phase5Verify.ps1
+```
+
 Manual: menu **Window → VST3 Host → Build IL2CPP Win64 (Verify)**. Asserts `VstHostNative.dll` is in the player output.
+
+Runtime EditMode coverage for `VstAudioGraph` (topo / cycle / `Build*` node counts) lives under
+`Tests/Runtime/VstAudioGraphTests.cs`.
 
 ## Standalone macOS
 
@@ -166,12 +191,16 @@ Manual: menu **Window → VST3 Host → Build IL2CPP Win64 (Verify)**. Asserts `
 ## Standalone Linux64
 
 1. Menu **Window → VST3 Host → Verify Plugin Platforms** (includes Linux `.so` flags).
-2. Menu **Window → VST3 Host → Build Standalone Linux64 (Verify)** (IL2CPP).
+2. Menu **Window → VST3 Host → Build Standalone Linux64 (Verify)** (tries **IL2CPP**, falls back to **Mono** if the Linux sysroot toolchain is missing — common when building from Windows).
 3. Confirm the player contains `VstHostNative.so`.
+
+From Windows, Phase 5 automation installs `com.unity.sysroot*` / Linux toolchain into the temp project when using `Run-Phase5Verify.ps1`.
 
 Prefer a full Linux desktop (VirtualBox / dual-boot) over WSL2 for Player and
 Editor audio checks. Plugin platform flags alone do not replace the manual
-Linux Editor steps above.
+Linux Editor steps above. On Windows hosts, `Run-Phase5Verify.ps1` may soft-pass
+Linux when the player build lacks IL2CPP sysroot / Linux Mono support, after
+confirming `VstHostNative.so` PluginImporter flags.
 
 When linking the repo via `file:` / Git, `native~/**/build*` outputs may appear — use **Window → VST3 Host → Sanitize Extra Native Plugins**.
 

@@ -67,3 +67,18 @@ Use `VstHostChannelRouteSync` to align Adapter ↔ Graph routes.
 - Stereo L/R, max **32** nodes, exactly **one** Output
 - See [audio-graph-plan.md](audio-graph-plan.md) §14 for bypass / validation rules
 - Sidechain verify plugin: SDK **AGain SideChain** ([verification.md](verification.md))
+- Manual scenario matrix (Instrument / Effect / Parallel / Send / Sidechain / ExternalIn):
+  [verification.md](verification.md) § Audio Graph (manual matrix)
+- Automated: `Tests/Runtime/VstAudioGraphTests.cs`;
+  `native~/windows-vst-host/Run-Phase5Verify.ps1`
+
+## Editor visualization
+
+**Window → VST3 Host → Audio Graph** opens a read-only view of the selected (or scene) `VstAudioGraph`:
+
+- Nodes (`id` / `kind` / `pluginId` / `gain` / `bypass`)
+- Edges (`from` → `to`, `toPort` Main|Sidechain, edge `gain`) with Send (Split) / Sidechain coloring
+- ChannelRoutes and arm status (`HasArmedGraph`, last arm error; failed arm keeps the previous snapshot)
+- Optional text diagram of connections
+
+Wiring stays on Inspector lists / `Build*` / `SetGraph`. The component Inspector also has a short overview foldout and an **Open Audio Graph Window** button.
