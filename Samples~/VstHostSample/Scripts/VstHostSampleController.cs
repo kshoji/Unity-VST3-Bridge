@@ -6,7 +6,7 @@ using UnityEngine;
 namespace jp.kshoji.unity.vst3nativehost.sample
 {
     /// <summary>
-    /// Sample controller: VST-only (scan / load / manual notes / audio / plugin chain).
+    /// Sample controller: VST-only (scan / load / manual notes / audio / audio graph).
     /// When Unity MIDI Plugin + <c>FEATURE_MIDI_PLUGIN</c> are available,
     /// optionally attaches <c>VstHostMidiAdapter</c> via reflection (no hard asmdef dependency).
     /// </summary>
@@ -18,13 +18,21 @@ namespace jp.kshoji.unity.vst3nativehost.sample
         private enum PlaybackMode
         {
             Single = 0,
-            Chain = 1,
+            Graph = 1,
+        }
+
+        private enum GraphDemoKind
+        {
+            ParallelSerial = 0,
+            SendReturn = 1,
+            Sidechain = 2,
         }
 
         [SerializeField] private string preferredPluginNameContains = "mda DX10";
         [SerializeField] private string fallbackPluginNameContains = "NoiseMaker";
         [SerializeField] private string preferredEffectNameContains = "AGain";
         [SerializeField] private string fallbackEffectNameContains = "Delay";
+        [SerializeField] private string preferredSidechainEffectNameContains = "SideChain";
         [SerializeField] private bool loadOnStart = true;
         [SerializeField] private bool showGui = true;
         [SerializeField] private bool enableMidiAdapterIfPresent = true;
@@ -35,7 +43,7 @@ namespace jp.kshoji.unity.vst3nativehost.sample
         private readonly List<VstHostManager.ScannedPlugin> scanned = new List<VstHostManager.ScannedPlugin>();
         private readonly List<int> loadedPluginIds = new List<int>();
         private VstHostAudioFilter audioFilter;
-        private VstPluginChain pluginChain;
+        private VstAudioGraph audioGraph;
         private VstHostParameterPanel parameterPanel;
         private Component midiAdapter;
         private Type midiAdapterType;
@@ -49,16 +57,26 @@ namespace jp.kshoji.unity.vst3nativehost.sample
         private float guiScale = 1f;
         private bool midiAvailable;
         private PlaybackMode playbackMode = PlaybackMode.Single;
-        private VstPluginChain.MixMode chainMixMode = VstPluginChain.MixMode.ParallelInstrumentsThenSerialEffects;
+        private GraphDemoKind graphDemoKind = GraphDemoKind.ParallelSerial;
         private bool effectBypass;
+        private bool graphMixExternalInput;
+        private float graphSendGain = 0.3f;
+        private int graphSplitNodeId = -1;
+        private int graphSendEffectNodeId = -1;
         private bool isLoading;
         private bool editEffectParameters;
 
         /// <summary>Currently loaded instrument plugin id, or -1 when unloaded.</summary>
         public int CurrentPluginId => pluginId;
 
-        /// <summary>Loaded effect plugin id in Chain mode, or -1.</summary>
+        /// <summary>Loaded effect plugin id in Graph mode, or -1.</summary>
         public int CurrentEffectPluginId => effectPluginId;
+
+        /// <summary>True when left panel is in Audio Graph mode.</summary>
+        public bool IsGraphMode => playbackMode == PlaybackMode.Graph;
+
+        /// <summary>Active graph component (may be disabled).</summary>
+        public VstAudioGraph AudioGraph => audioGraph;
 
         /// <summary>True when the optional MIDI adapter assembly is present.</summary>
         public bool MidiAssemblyAvailable => midiAvailable;
@@ -75,12 +93,13 @@ namespace jp.kshoji.unity.vst3nativehost.sample
             if (audioFilter == null)
                 audioFilter = gameObject.AddComponent<VstHostAudioFilter>();
             audioFilter.Mode = VstHostAudioFilter.ProcessMode.Instrument;
-            audioFilter.EnsureSilentSourcePlaying();
 
-            pluginChain = GetComponent<VstPluginChain>();
-            if (pluginChain == null)
-                pluginChain = gameObject.AddComponent<VstPluginChain>();
-            pluginChain.enabled = false;
+            // Disable siblings before AddComponent so Graph.OnEnable does not see an active peer path.
+            audioFilter.enabled = false;
+            audioGraph = GetComponent<VstAudioGraph>();
+            if (audioGraph == null)
+                audioGraph = gameObject.AddComponent<VstAudioGraph>();
+            audioGraph.enabled = false;
 
             parameterPanel = GetComponent<VstHostParameterPanel>();
             if (parameterPanel == null)
@@ -88,6 +107,8 @@ namespace jp.kshoji.unity.vst3nativehost.sample
 
             TryEnsureMidiAdapter();
             ApplyAudioPathEnabledState();
+            if (audioFilter != null && audioFilter.enabled)
+                audioFilter.EnsureSilentSourcePlaying();
 
             if (GetComponent<VstHostSampleFeatureDemos>() == null)
                 gameObject.AddComponent<VstHostSampleFeatureDemos>();
@@ -133,19 +154,87 @@ namespace jp.kshoji.unity.vst3nativehost.sample
 
         private void ApplyAudioPathEnabledState()
         {
-            var useChain = playbackMode == PlaybackMode.Chain;
+            var useGraph = playbackMode == PlaybackMode.Graph;
+
+            // Disable every path first so two OnAudioFilterRead handlers never run in one callback.
             if (audioFilter != null)
+                audioFilter.enabled = false;
+            if (audioGraph != null)
+                audioGraph.enabled = false;
+
+            if (useGraph)
             {
-                audioFilter.enabled = !useChain;
-                if (!useChain)
-                    audioFilter.EnsureSilentSourcePlaying();
+                if (audioGraph != null)
+                {
+                    audioGraph.enabled = true;
+                    audioGraph.EnsureSilentSourcePlaying();
+                }
+            }
+            else if (audioFilter != null)
+            {
+                audioFilter.enabled = true;
+                audioFilter.EnsureSilentSourcePlaying();
             }
 
-            if (pluginChain != null)
+            // Restart the shared AudioSource so Unity rebinds the active OnAudioFilterRead chain.
+            RestartSharedAudioSource();
+        }
+
+        private void RestartSharedAudioSource()
+        {
+            var src = GetComponent<AudioSource>();
+            if (src == null)
+                return;
+            if (src.clip == null)
             {
-                pluginChain.enabled = useChain;
-                if (useChain)
-                    pluginChain.EnsureSilentSourcePlaying();
+                const int len = 256;
+                var clip = AudioClip.Create("VstHostSampleSilence", len, 1, AudioSettings.outputSampleRate, false);
+                clip.SetData(new float[len], 0);
+                src.clip = clip;
+                src.loop = true;
+                src.playOnAwake = false;
+            }
+
+            src.Stop();
+            src.Play();
+        }
+
+        private static void ApplyPluginDefaultParameters(int pluginId)
+        {
+            if (pluginId < 1 || !VstHostManager.Instance.IsInitialized)
+                return;
+            var parameters = VstHostManager.Instance.GetParameters(pluginId);
+            for (var i = 0; i < parameters.Count; i++)
+            {
+                var p = parameters[i];
+                VstHostManager.Instance.SetParameterNormalized(pluginId, p.Id, p.DefaultNormalized);
+            }
+        }
+
+        /// <summary>
+        /// AGain (and similar) default to ~unity, so Bypass A/B is inaudible. Pull Gain down for demos.
+        /// </summary>
+        private static void ApplyAudibleDemoEffectTone(int effectPluginId)
+        {
+            if (effectPluginId < 1 || !VstHostManager.Instance.IsInitialized)
+                return;
+
+            const double wetNormalized = 0.25;
+            var parameters = VstHostManager.Instance.GetParameters(effectPluginId);
+            for (var i = 0; i < parameters.Count; i++)
+            {
+                var p = parameters[i];
+                if (p.IsReadOnly)
+                    continue;
+                var title = p.Title ?? string.Empty;
+                if (title.IndexOf("Gain", StringComparison.OrdinalIgnoreCase) < 0
+                    && title.IndexOf("Volume", StringComparison.OrdinalIgnoreCase) < 0
+                    && title.IndexOf("Level", StringComparison.OrdinalIgnoreCase) < 0
+                    && i != 0)
+                    continue;
+
+                VstHostManager.Instance.SetParameterNormalized(effectPluginId, p.Id, wetNormalized);
+                return;
             }
         }
 
@@ -175,8 +264,8 @@ namespace jp.kshoji.unity.vst3nativehost.sample
 
             selectedIndex = ResolvePreferredInstrumentIndex();
             selectedEffectIndex = ResolvePreferredEffectIndex();
-            if (playbackMode == PlaybackMode.Chain)
-                BuildChain();
+            if (playbackMode == PlaybackMode.Graph)
+                BuildGraph();
             else
                 LoadSelected();
         }
@@ -249,9 +338,18 @@ namespace jp.kshoji.unity.vst3nativehost.sample
             UnloadCurrent();
             playbackMode = mode;
             ApplyAudioPathEnabledState();
-            status = mode == PlaybackMode.Chain
-                ? "Chain mode: select instrument + effect, then Build Chain"
-                : "Single mode";
+            if (mode == PlaybackMode.Graph && graphDemoKind == GraphDemoKind.Sidechain)
+                selectedEffectIndex = ResolvePreferredSidechainEffectIndex();
+            if (mode == PlaybackMode.Graph)
+                status = "Graph mode: pick demo, select plugins, then Build Graph";
+            else
+                status = "Single mode";
+        }
+
+        private int ResolvePreferredSidechainEffectIndex()
+        {
+            var index = FindPreferredIndex(preferredSidechainEffectNameContains);
+            return index >= 0 ? index : ResolvePreferredEffectIndex();
         }
 
         private void LoadSelected()
@@ -304,7 +402,7 @@ namespace jp.kshoji.unity.vst3nativehost.sample
             }
         }
 
-        private void BuildChain()
+        private void BuildGraph()
         {
             if (isLoading)
                 return;
@@ -316,11 +414,17 @@ namespace jp.kshoji.unity.vst3nativehost.sample
                 return;
             }
 
+            if (audioGraph == null)
+            {
+                status = "VstAudioGraph missing";
+                return;
+            }
+
             isLoading = true;
             try
             {
                 UnloadCurrent();
-                playbackMode = PlaybackMode.Chain;
+                playbackMode = PlaybackMode.Graph;
                 ApplyAudioPathEnabledState();
 
                 var instrument = scanned[selectedIndex];
@@ -346,35 +450,81 @@ namespace jp.kshoji.unity.vst3nativehost.sample
 
                 loadedPluginIds.Add(effectPluginId);
 
-                pluginChain.Mode = chainMixMode;
-                pluginChain.SetSlots(new[]
+                ApplyPluginDefaultParameters(pluginId);
+                ApplyPluginDefaultParameters(effectPluginId);
+                ApplyAudibleDemoEffectTone(effectPluginId);
+
+                graphSplitNodeId = -1;
+                graphSendEffectNodeId = -1;
+                var ok = false;
+                switch (graphDemoKind)
                 {
-                    VstPluginChain.Slot.Instrument(pluginId),
-                    VstPluginChain.Slot.Effect(effectPluginId),
-                });
-                pluginChain.SetBypass(effectPluginId, effectBypass);
-                pluginChain.EnsureSilentSourcePlaying();
-                if (audioFilter != null)
-                    audioFilter.EnsureSilentSourcePlaying();
+                    case GraphDemoKind.SendReturn:
+                        ok = audioGraph.BuildSendReturn(pluginId, effectPluginId, graphSendGain, dryGain: 1f);
+                        CacheSendReturnNodeIds();
+                        break;
+                    case GraphDemoKind.Sidechain:
+                        ok = audioGraph.BuildSidechainFromSingleSource(pluginId, effectPluginId);
+                        break;
+                    default:
+                        ok = audioGraph.BuildParallelInstrumentsThenSerialEffects(
+                            new[] { pluginId },
+                            new[] { effectPluginId },
+                            mixExternalInput: graphMixExternalInput);
+                        break;
+                }
+
+                if (!ok || !audioGraph.HasArmedGraph)
+                {
+                    status = "Graph build/arm failed (see Console)";
+                    DestroyLoadedInstances();
+                    pluginId = -1;
+                    effectPluginId = -1;
+                    return;
+                }
+
+                if (effectBypass)
+                    audioGraph.SetBypassByPluginId(effectPluginId, true);
+
+                // Re-assert path + restart so OnAudioFilterRead is bound after arm.
+                ApplyAudioPathEnabledState();
 
                 editEffectParameters = false;
                 BindParameterPanel(pluginId);
                 SetMidiTarget(pluginId);
 
-                var instrCat = instrument.Category ?? string.Empty;
-                var warnFxAsInstr = instrCat.IndexOf("Instrument", StringComparison.OrdinalIgnoreCase) < 0
-                    && (instrCat.IndexOf("Fx", StringComparison.OrdinalIgnoreCase) >= 0
-                        || instrCat.IndexOf("Effect", StringComparison.OrdinalIgnoreCase) >= 0);
-
+                var demoLabel = "Parallel→Serial";
+                if (graphDemoKind == GraphDemoKind.SendReturn)
+                    demoLabel = "Send/Return";
+                else if (graphDemoKind == GraphDemoKind.Sidechain)
+                    demoLabel = "Sidechain";
                 status =
-                    $"Chain: [{pluginId}] {instrument.Name} → [{effectPluginId}] {effect.Name}"
-                    + (effectBypass ? " (effect bypassed)" : string.Empty);
-                if (warnFxAsInstr)
-                    status += " — warning: top list looks like an Effect; pick a synth/Instrument or Note On stays silent";
+                    $"Graph [{demoLabel}]: [{pluginId}] {instrument.Name} → [{effectPluginId}] {effect.Name}"
+                    + (effectBypass ? " (effect bypassed)" : string.Empty)
+                    + (graphDemoKind == GraphDemoKind.SendReturn ? $" send={graphSendGain:0.00}" : string.Empty)
+                    + (graphMixExternalInput && graphDemoKind == GraphDemoKind.ParallelSerial
+                        ? " +ExternalIn"
+                        : string.Empty)
+                    + (audioGraph.enabled ? " [path=Graph]" : " [WARN: Graph disabled]");
             }
             finally
             {
                 isLoading = false;
+            }
+        }
+
+        private void CacheSendReturnNodeIds()
+        {
+            graphSplitNodeId = -1;
+            graphSendEffectNodeId = -1;
+            if (audioGraph == null)
+                return;
+            foreach (var n in audioGraph.Nodes)
+            {
+                if (n.kind == VstGraphNodeKind.Split)
+                    graphSplitNodeId = n.id;
+                if (n.kind == VstGraphNodeKind.Effect)
+                    graphSendEffectNodeId = n.id;
             }
         }
 
@@ -383,14 +533,16 @@ namespace jp.kshoji.unity.vst3nativehost.sample
             SetMidiTarget(-1);
             if (audioFilter != null)
                 audioFilter.DetachPlugin();
-            if (pluginChain != null)
-                pluginChain.ClearSlots();
+            if (audioGraph != null)
+                audioGraph.ClearGraph();
             if (parameterPanel != null)
                 parameterPanel.PluginId = -1;
 
             DestroyLoadedInstances();
             pluginId = -1;
             effectPluginId = -1;
+            graphSplitNodeId = -1;
+            graphSendEffectNodeId = -1;
             editEffectParameters = false;
             status = "Unloaded";
         }
@@ -406,7 +558,7 @@ namespace jp.kshoji.unity.vst3nativehost.sample
         private void SetParameterEditTarget(bool effect)
         {
             editEffectParameters = effect;
-            if (playbackMode != PlaybackMode.Chain)
+            if (playbackMode != PlaybackMode.Graph)
                 return;
 
             var id = effect ? effectPluginId : pluginId;
@@ -448,9 +600,9 @@ namespace jp.kshoji.unity.vst3nativehost.sample
 
         private int ResolveNoteTargetPluginId()
         {
-            if (playbackMode == PlaybackMode.Chain && pluginChain != null)
+            if (playbackMode == PlaybackMode.Graph && audioGraph != null)
             {
-                var routed = pluginChain.ResolveInstrumentPluginId(channel);
+                var routed = audioGraph.ResolveInstrumentPluginId(channel);
                 if (routed >= 1)
                     return routed;
             }
@@ -461,18 +613,42 @@ namespace jp.kshoji.unity.vst3nativehost.sample
         private void ApplyEffectBypass(bool bypass)
         {
             effectBypass = bypass;
-            if (playbackMode == PlaybackMode.Chain && effectPluginId >= 1 && pluginChain != null)
+            if (effectPluginId < 1)
+                return;
+
+            if (playbackMode == PlaybackMode.Graph && audioGraph != null)
             {
-                pluginChain.SetBypass(effectPluginId, bypass);
-                status = bypass ? "Effect bypassed" : "Effect engaged";
+                audioGraph.SetBypassByPluginId(effectPluginId, bypass);
+                status = bypass
+                    ? "Effect bypassed (dry / full level)"
+                    : "Effect engaged (demo Gain≈0.25 — should be quieter than bypass)";
             }
         }
 
-        private void ApplyChainMixMode(VstPluginChain.MixMode mode)
+        private void SetGraphDemoKind(GraphDemoKind kind)
         {
-            chainMixMode = mode;
-            if (pluginChain != null)
-                pluginChain.Mode = mode;
+            if (graphDemoKind == kind)
+                return;
+            graphDemoKind = kind;
+            if (kind == GraphDemoKind.Sidechain)
+                selectedEffectIndex = ResolvePreferredSidechainEffectIndex();
+            if (kind == GraphDemoKind.SendReturn)
+                status = "Graph demo: Send/Return (Build Graph)";
+            else if (kind == GraphDemoKind.Sidechain)
+                status = "Graph demo: Sidechain — prefer AGain SideChain effect";
+            else
+                status = "Graph demo: Parallel instruments → serial effects";
+        }
+
+        private void ApplyGraphSendGain(float gain)
+        {
+            graphSendGain = Mathf.Clamp(gain, 0f, 2f);
+            if (playbackMode != PlaybackMode.Graph || audioGraph == null)
+                return;
+            if (graphSplitNodeId < 1 || graphSendEffectNodeId < 1)
+                return;
+            if (audioGraph.SetEdgeGain(graphSplitNodeId, graphSendEffectNodeId, VstGraphPort.Main, graphSendGain))
+                status = $"Send gain = {graphSendGain:0.00}";
         }
 
         private void OnGUI()
@@ -481,7 +657,7 @@ namespace jp.kshoji.unity.vst3nativehost.sample
 
             var prev = GUI.matrix;
             GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(guiScale, guiScale, 1f));
-            GUILayout.BeginArea(new Rect(12, 12, 460f, Screen.height / guiScale - 24));
+            GUILayout.BeginArea(new Rect(12, 12, 480f, Screen.height / guiScale - 24));
             GUILayout.BeginVertical("box");
 
             GUILayout.Label("Unity Plugin Host for VST3 — Sample");
@@ -493,8 +669,8 @@ namespace jp.kshoji.unity.vst3nativehost.sample
             GUILayout.BeginHorizontal();
             if (GUILayout.Toggle(playbackMode == PlaybackMode.Single, "Single", "Button"))
                 SetPlaybackMode(PlaybackMode.Single);
-            if (GUILayout.Toggle(playbackMode == PlaybackMode.Chain, "Plugin Chain", "Button"))
-                SetPlaybackMode(PlaybackMode.Chain);
+            if (GUILayout.Toggle(playbackMode == PlaybackMode.Graph, "Audio Graph", "Button"))
+                SetPlaybackMode(PlaybackMode.Graph);
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
@@ -507,18 +683,19 @@ namespace jp.kshoji.unity.vst3nativehost.sample
             }
             else
             {
-                if (GUILayout.Button("Build Chain"))
-                    BuildChain();
+                if (GUILayout.Button("Build Graph"))
+                    BuildGraph();
             }
 
             if (GUILayout.Button("Unload"))
                 UnloadCurrent();
             GUILayout.EndHorizontal();
 
-            GUILayout.Label(playbackMode == PlaybackMode.Chain
+            var multiPlugin = playbackMode == PlaybackMode.Graph;
+            GUILayout.Label(multiPlugin
                 ? "Instrument (notes / MIDI target)"
                 : "Plugin");
-            scroll = GUILayout.BeginScrollView(scroll, GUILayout.Height(playbackMode == PlaybackMode.Chain ? 120 : 180));
+            scroll = GUILayout.BeginScrollView(scroll, GUILayout.Height(multiPlugin ? 100 : 180));
             for (var i = 0; i < scanned.Count; i++)
             {
                 var label = $"{scanned[i].Name} [{scanned[i].Category}]";
@@ -527,50 +704,8 @@ namespace jp.kshoji.unity.vst3nativehost.sample
             }
             GUILayout.EndScrollView();
 
-            if (playbackMode == PlaybackMode.Chain)
-            {
-                GUILayout.Label("Effect (serial after instrument)");
-                effectScroll = GUILayout.BeginScrollView(effectScroll, GUILayout.Height(120));
-                for (var i = 0; i < scanned.Count; i++)
-                {
-                    var label = $"{scanned[i].Name} [{scanned[i].Category}]";
-                    if (GUILayout.Toggle(selectedEffectIndex == i, label, "Button"))
-                        selectedEffectIndex = i;
-                }
-                GUILayout.EndScrollView();
-
-                GUILayout.BeginHorizontal();
-                if (GUILayout.Toggle(
-                        chainMixMode == VstPluginChain.MixMode.ParallelInstrumentsThenSerialEffects,
-                        "Parallel→Serial",
-                        "Button"))
-                    ApplyChainMixMode(VstPluginChain.MixMode.ParallelInstrumentsThenSerialEffects);
-                if (GUILayout.Toggle(
-                        chainMixMode == VstPluginChain.MixMode.StrictSerial,
-                        "Strict Serial",
-                        "Button"))
-                    ApplyChainMixMode(VstPluginChain.MixMode.StrictSerial);
-                GUILayout.EndHorizontal();
-
-                // Button style so it matches other toolbar toggles (plain Toggle is easy to miss).
-                var bypass = GUILayout.Toggle(
-                    effectBypass,
-                    effectBypass ? "Bypass effect: ON (dry)" : "Bypass effect: OFF (wet)",
-                    "Button");
-                if (bypass != effectBypass)
-                    ApplyEffectBypass(bypass);
-
-                if (pluginId >= 1 && effectPluginId >= 1)
-                {
-                    GUILayout.Label($"Active chain ids: instr={pluginId}  fx={effectPluginId}");
-                    GUILayout.BeginHorizontal();
-                    if (GUILayout.Toggle(!editEffectParameters, "Edit Instrument params", "Button"))
-                        SetParameterEditTarget(false);
-                    if (GUILayout.Toggle(editEffectParameters, "Edit Effect params", "Button"))
-                        SetParameterEditTarget(true);
-                    GUILayout.EndHorizontal();
-                }
-            }
+            if (playbackMode == PlaybackMode.Graph)
+                DrawGraphControls();
 
             GUILayout.Label($"Note {note}  Velocity {velocity}  Channel {channel}");
             note = Mathf.RoundToInt(GUILayout.HorizontalSlider(note, 0, 127));
@@ -584,10 +719,70 @@ namespace jp.kshoji.unity.vst3nativehost.sample
                 NoteOff();
             GUILayout.EndHorizontal();
 
-            GUILayout.Label("See Documentation~/verification.md and plugin-chain.md.");
+            GUILayout.Label("See Documentation~/verification.md, audio-graph.md.");
             GUILayout.EndVertical();
             GUILayout.EndArea();
             GUI.matrix = prev;
+        }
+
+        private void DrawGraphControls()
+        {
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Toggle(graphDemoKind == GraphDemoKind.ParallelSerial, "Parallel→Serial", "Button"))
+                SetGraphDemoKind(GraphDemoKind.ParallelSerial);
+            if (GUILayout.Toggle(graphDemoKind == GraphDemoKind.SendReturn, "Send/Return", "Button"))
+                SetGraphDemoKind(GraphDemoKind.SendReturn);
+            if (GUILayout.Toggle(graphDemoKind == GraphDemoKind.Sidechain, "Sidechain", "Button"))
+                SetGraphDemoKind(GraphDemoKind.Sidechain);
+            GUILayout.EndHorizontal();
+
+            GUILayout.Label(graphDemoKind == GraphDemoKind.Sidechain
+                ? "Effect (prefer AGain SideChain)"
+                : "Effect");
+            effectScroll = GUILayout.BeginScrollView(effectScroll, GUILayout.Height(100));
+            for (var i = 0; i < scanned.Count; i++)
+            {
+                var label = $"{scanned[i].Name} [{scanned[i].Category}]";
+                if (GUILayout.Toggle(selectedEffectIndex == i, label, "Button"))
+                    selectedEffectIndex = i;
+            }
+            GUILayout.EndScrollView();
+
+            if (graphDemoKind == GraphDemoKind.ParallelSerial)
+            {
+                var ext = GUILayout.Toggle(graphMixExternalInput, "Mix ExternalIn (upstream filter)", "Button");
+                if (ext != graphMixExternalInput)
+                    graphMixExternalInput = ext;
+            }
+
+            if (graphDemoKind == GraphDemoKind.SendReturn)
+            {
+                GUILayout.Label($"Send gain {graphSendGain:0.00}");
+                var g = GUILayout.HorizontalSlider(graphSendGain, 0f, 1f);
+                if (!Mathf.Approximately(g, graphSendGain))
+                    ApplyGraphSendGain(g);
+            }
+
+            var bypass = GUILayout.Toggle(
+                effectBypass,
+                effectBypass
+                    ? "Bypass effect: ON (dry / full)"
+                    : "Bypass effect: OFF (wet / quieter demo Gain)",
+                "Button");
+            if (bypass != effectBypass)
+                ApplyEffectBypass(bypass);
+
+            if (pluginId >= 1 && effectPluginId >= 1)
+            {
+                GUILayout.Label($"Active graph ids: instr={pluginId}  fx={effectPluginId}");
+                GUILayout.Label("Tip: AGain default≈unity — demo sets Gain≈0.25 so Bypass A/B is audible.");
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Toggle(!editEffectParameters, "Edit Instrument params", "Button"))
+                    SetParameterEditTarget(false);
+                if (GUILayout.Toggle(editEffectParameters, "Edit Effect params", "Button"))
+                    SetParameterEditTarget(true);
+                GUILayout.EndHorizontal();
+            }
         }
     }
 }

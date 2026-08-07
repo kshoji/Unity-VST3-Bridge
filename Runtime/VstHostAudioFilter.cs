@@ -107,7 +107,7 @@ namespace jp.kshoji.unity.vst3nativehost
             Volatile.Write(ref pendingPluginId, -1);
             Volatile.Write(ref armedPluginId, -1);
             Volatile.Write(ref pluginId, -1);
-            // Do not Pause the AudioSource: the same GameObject may host VstPluginChain,
+            // Do not Pause the AudioSource: the same GameObject may host VstAudioGraph,
             // which needs the silent clip to keep playing for OnAudioFilterRead.
         }
 

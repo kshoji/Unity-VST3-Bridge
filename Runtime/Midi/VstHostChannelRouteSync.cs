@@ -6,27 +6,27 @@ namespace jp.kshoji.unity.vst3nativehost
 {
     /// <summary>
     /// Keeps <see cref="VstHostMidiAdapter"/> channel→plugin routes aligned with
-    /// <see cref="VstPluginChain"/> channel→slot routes (and vice versa).
+    /// <see cref="VstAudioGraph"/> channel→instrument node routes (and vice versa).
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class VstHostChannelRouteSync : MonoBehaviour
     {
         public enum SyncDirection
         {
-            AdapterToChain = 0,
-            ChainToAdapter = 1,
+            AdapterToGraph = 0,
+            GraphToAdapter = 1,
             BidirectionalOnEnable = 2,
         }
 
         [SerializeField] private VstHostMidiAdapter adapter;
-        [SerializeField] private VstPluginChain chain;
-        [SerializeField] private SyncDirection direction = SyncDirection.ChainToAdapter;
+        [SerializeField] private VstAudioGraph graph;
+        [SerializeField] private SyncDirection direction = SyncDirection.GraphToAdapter;
         [SerializeField] private bool syncOnEnable = true;
 
         private void Reset()
         {
             adapter = GetComponent<VstHostMidiAdapter>();
-            chain = GetComponent<VstPluginChain>();
+            graph = GetComponent<VstAudioGraph>();
         }
 
         private void OnEnable()
@@ -40,53 +40,50 @@ namespace jp.kshoji.unity.vst3nativehost
         {
             if (adapter == null)
                 adapter = GetComponent<VstHostMidiAdapter>();
-            if (chain == null)
-                chain = GetComponent<VstPluginChain>();
-            if (adapter == null || chain == null)
+            if (graph == null)
+                graph = GetComponent<VstAudioGraph>();
+            if (adapter == null || graph == null)
             {
-                Debug.LogWarning("[VstHostChannelRouteSync] Adapter and VstPluginChain are required.", this);
+                Debug.LogWarning("[VstHostChannelRouteSync] Adapter and VstAudioGraph are required.", this);
                 return;
             }
 
             switch (direction)
             {
-                case SyncDirection.AdapterToChain:
-                    ApplyAdapterToChain();
+                case SyncDirection.AdapterToGraph:
+                    ApplyAdapterToGraph();
                     break;
-                case SyncDirection.ChainToAdapter:
-                    ApplyChainToAdapter();
+                case SyncDirection.GraphToAdapter:
+                    ApplyGraphToAdapter();
                     break;
                 case SyncDirection.BidirectionalOnEnable:
-                    if (chain.ChannelRoutes != null && chain.ChannelRoutes.Count > 0)
-                        ApplyChainToAdapter();
+                    if (graph.ChannelRoutes != null && graph.ChannelRoutes.Count > 0)
+                        ApplyGraphToAdapter();
                     else
-                        ApplyAdapterToChain();
+                        ApplyAdapterToGraph();
                     break;
             }
         }
 
-        public void ApplyChainToAdapter()
+        public void ApplyGraphToAdapter()
         {
-            if (adapter == null || chain == null)
+            if (adapter == null || graph == null)
                 return;
 
             var routes = new List<VstHostMidiAdapter.ChannelRoute>();
-            var slots = chain.Slots;
-            var channelRoutes = chain.ChannelRoutes;
-            if (channelRoutes != null && slots != null)
+            var nodes = graph.Nodes;
+            var channelRoutes = graph.ChannelRoutes;
+            if (channelRoutes != null && nodes != null)
             {
                 for (var i = 0; i < channelRoutes.Count; i++)
                 {
                     var cr = channelRoutes[i];
-                    if (cr.slotIndex < 0 || cr.slotIndex >= slots.Count)
-                        continue;
-                    var slot = slots[cr.slotIndex];
-                    if (slot.role != VstPluginChain.SlotRole.Instrument || slot.pluginId < 1)
+                    if (!TryFindInstrumentPluginId(nodes, cr.nodeId, out var pluginId))
                         continue;
                     routes.Add(new VstHostMidiAdapter.ChannelRoute
                     {
                         channel = cr.channel,
-                        pluginId = slot.pluginId,
+                        pluginId = pluginId,
                     });
                 }
             }
@@ -94,42 +91,63 @@ namespace jp.kshoji.unity.vst3nativehost
             adapter.SetChannelRoutes(routes);
         }
 
-        public void ApplyAdapterToChain()
+        public void ApplyAdapterToGraph()
         {
-            if (adapter == null || chain == null)
+            if (adapter == null || graph == null)
                 return;
 
-            var slots = chain.Slots;
-            if (slots == null || slots.Count == 0)
+            var nodes = graph.Nodes;
+            if (nodes == null || nodes.Count == 0)
                 return;
 
-            var pluginToSlot = new Dictionary<int, int>();
-            for (var i = 0; i < slots.Count; i++)
+            var pluginToNodeId = new Dictionary<int, int>();
+            for (var i = 0; i < nodes.Count; i++)
             {
-                if (slots[i].role != VstPluginChain.SlotRole.Instrument || slots[i].pluginId < 1)
+                var n = nodes[i];
+                if (n.kind != VstGraphNodeKind.Instrument || n.pluginId < 1)
                     continue;
-                if (!pluginToSlot.ContainsKey(slots[i].pluginId))
-                    pluginToSlot[slots[i].pluginId] = i;
+                if (!pluginToNodeId.ContainsKey(n.pluginId))
+                    pluginToNodeId[n.pluginId] = n.id;
             }
 
-            var built = new List<VstPluginChain.ChannelRoute>();
+            var built = new List<VstAudioGraph.ChannelRoute>();
             var adapterRoutes = adapter.ChannelRoutes;
             if (adapterRoutes != null)
             {
                 for (var i = 0; i < adapterRoutes.Count; i++)
                 {
                     var ar = adapterRoutes[i];
-                    if (ar.pluginId < 1 || !pluginToSlot.TryGetValue(ar.pluginId, out var slotIndex))
+                    if (ar.pluginId < 1 || !pluginToNodeId.TryGetValue(ar.pluginId, out var nodeId))
                         continue;
-                    built.Add(new VstPluginChain.ChannelRoute
+                    built.Add(new VstAudioGraph.ChannelRoute
                     {
                         channel = ar.channel,
-                        slotIndex = slotIndex,
+                        nodeId = nodeId,
                     });
                 }
             }
 
-            chain.SetChannelRoutes(built);
+            graph.SetChannelRoutes(built);
+        }
+
+        private static bool TryFindInstrumentPluginId(
+            IList<VstGraphNode> nodes, int nodeId, out int pluginId)
+        {
+            pluginId = -1;
+            if (nodes == null)
+                return false;
+            for (var i = 0; i < nodes.Count; i++)
+            {
+                var n = nodes[i];
+                if (n.id != nodeId)
+                    continue;
+                if (n.kind != VstGraphNodeKind.Instrument || n.pluginId < 1)
+                    return false;
+                pluginId = n.pluginId;
+                return true;
+            }
+
+            return false;
         }
     }
 }

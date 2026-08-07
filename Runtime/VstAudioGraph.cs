@@ -7,7 +7,7 @@ namespace jp.kshoji.unity.vst3nativehost
 {
     /// <summary>
     /// Node-graph DSP host driven by <see cref="OnAudioFilterRead"/>.
-    /// Do not also enable <see cref="VstHostAudioFilter"/> / <see cref="VstPluginChain"/> on the same AudioSource.
+    /// Do not also enable <see cref="VstHostAudioFilter"/> on the same AudioSource.
     /// V1 is a stereo DAG (see Documentation~/audio-graph-plan.md §14).
     /// </summary>
     [RequireComponent(typeof(AudioSource))]
@@ -512,7 +512,6 @@ namespace jp.kshoji.unity.vst3nativehost
         private void OnEnable()
         {
             Volatile.Write(ref armed, 1);
-            WarnIfPeerAudioComponents();
             TryArmGraph(logFailures: true);
             if (autoPlaySilentSource)
                 EnsureSilentSourcePlaying();
@@ -561,6 +560,8 @@ namespace jp.kshoji.unity.vst3nativehost
             // Warning text is de-duplicated via lastArmError.
             TryArmGraph(logFailures: true);
             EnsureScratchCapacityMainThread();
+            // Defer peer-path warning: AddComponent enables this briefly while Sample still has Filter on.
+            WarnIfPeerAudioComponents();
             VstHostDspMidiQueue.Shared.PumpMainThreadDiagnostics();
             VstHostAudioDiagnostics.PumpMainThreadDiagnostics();
             VstHostActivity.PumpMainThread();
@@ -580,15 +581,14 @@ namespace jp.kshoji.unity.vst3nativehost
 
         private void WarnIfPeerAudioComponents()
         {
-            if (warnedPeerComponent)
+            if (warnedPeerComponent || !isActiveAndEnabled)
                 return;
             var filter = GetComponent<VstHostAudioFilter>();
-            var chain = GetComponent<VstPluginChain>();
-            if ((filter != null && filter.enabled) || (chain != null && chain.enabled))
+            if (filter != null && filter.enabled)
             {
                 warnedPeerComponent = true;
                 Debug.LogWarning(
-                    "[VstAudioGraph] Disable VstHostAudioFilter / VstPluginChain on the same GameObject; " +
+                    "[VstAudioGraph] Disable VstHostAudioFilter on the same GameObject; " +
                     "only one audio path should run.");
             }
         }
@@ -964,7 +964,7 @@ namespace jp.kshoji.unity.vst3nativehost
             var snap = Volatile.Read(ref armedSnap);
             if (snap == null)
             {
-                Array.Clear(data, 0, data.Length);
+                // Pass through — do not zero the buffer (avoids wiping a peer path during mode switches).
                 return;
             }
 
@@ -1195,8 +1195,13 @@ namespace jp.kshoji.unity.vst3nativehost
             public int externalInIndex;
             public ChannelRoute[] routes;
 
-            public bool TryGetNodeIndex(int nodeId, out int index) =>
-                idToIndex != null && idToIndex.TryGetValue(nodeId, out index);
+            public bool TryGetNodeIndex(int nodeId, out int index)
+            {
+                if (idToIndex != null && idToIndex.TryGetValue(nodeId, out index))
+                    return true;
+                index = -1;
+                return false;
+            }
         }
     }
 }

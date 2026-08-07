@@ -8,7 +8,7 @@ namespace jp.kshoji.unity.vst3nativehost.scriptableaudio
     /// <summary>
     /// Mirrors <see cref="MidiDspSequenceScheduler"/> timed MIDI into
     /// <see cref="VstHostDspMidiQueue"/> for DSP-clocked VST playback
-    /// (pair with <see cref="VstHostGenerator"/> or <see cref="VstHostAudioFilter"/> / <see cref="VstPluginChain"/>).
+    /// (pair with <see cref="VstHostGenerator"/> or <see cref="VstHostAudioFilter"/> / <see cref="VstAudioGraph"/>).
     /// Assign this component to the scheduler's <c>extraTimedMidiOutput</c> field.
     /// </summary>
     [DisallowMultipleComponent]
@@ -16,7 +16,7 @@ namespace jp.kshoji.unity.vst3nativehost.scriptableaudio
     {
         [SerializeField] private int targetPluginId = -1;
         [SerializeField] private VstParameterTarget parameterTarget;
-        [SerializeField] private VstPluginChain pluginChain;
+        [SerializeField] private VstAudioGraph audioGraph;
         [SerializeField] private bool bridgeEnabled = true;
         [Tooltip("-1 keeps the source channel from the scheduled event.")]
         [SerializeField] private int outputChannelOverride = -1;
@@ -35,9 +35,9 @@ namespace jp.kshoji.unity.vst3nativehost.scriptableaudio
 
         int ResolvePluginId(byte channel)
         {
-            if (pluginChain != null)
+            if (audioGraph != null)
             {
-                var routed = pluginChain.ResolveInstrumentPluginId(
+                var routed = audioGraph.ResolveInstrumentPluginId(
                     outputChannelOverride >= 0 ? outputChannelOverride : channel);
                 if (routed >= 1)
                     return routed;
