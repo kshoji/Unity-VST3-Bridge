@@ -14,7 +14,7 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
     /// Batchmode OSX: -executeMethod jp.kshoji.unity.vst3nativehost.Editor.VstHostBuildVerify.BuildStandaloneOSX
     /// Batchmode Linux: -executeMethod jp.kshoji.unity.vst3nativehost.Editor.VstHostBuildVerify.BuildStandaloneLinux64
     /// Batchmode platforms: -executeMethod jp.kshoji.unity.vst3nativehost.Editor.VstHostBuildVerify.VerifyPluginPlatformsExit
-    /// Phase 5 smoke: native~/windows-vst-host/Run-Phase5Verify.ps1
+    /// Full smoke (tests + builds): native~/windows-vst-host/Run-TestsAndBuildVerify.ps1
     /// </summary>
     public static class VstHostBuildVerify
     {

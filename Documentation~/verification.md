@@ -171,10 +171,10 @@ Automated (recommended):
 .\native~\windows-vst-host\Run-Il2CppVerify.ps1
 ```
 
-Phase 5 full smoke (EditMode tests + Win64 IL2CPP + OSX + Linux64 verify builds):
+Full smoke (EditMode + PlayMode tests, then Win64 IL2CPP / OSX / Linux64 verify builds):
 
 ```powershell
-.\native~\windows-vst-host\Run-Phase5Verify.ps1
+.\native~\windows-vst-host\Run-TestsAndBuildVerify.ps1
 ```
 
 Manual: menu **Window → VST3 Host → Build IL2CPP Win64 (Verify)**. Asserts `VstHostNative.dll` is in the player output.
@@ -194,13 +194,14 @@ Runtime EditMode coverage for `VstAudioGraph` (topo / cycle / `Build*` node coun
 2. Menu **Window → VST3 Host → Build Standalone Linux64 (Verify)** (tries **IL2CPP**, falls back to **Mono** if the Linux sysroot toolchain is missing — common when building from Windows).
 3. Confirm the player contains `VstHostNative.so`.
 
-From Windows, Phase 5 automation installs `com.unity.sysroot*` / Linux toolchain into the temp project when using `Run-Phase5Verify.ps1`.
+From Windows, `Run-TestsAndBuildVerify.ps1` installs `com.unity.sysroot*` / Linux
+toolchain into the temp project for Linux64 player attempts.
 
 Prefer a full Linux desktop (VirtualBox / dual-boot) over WSL2 for Player and
 Editor audio checks. Plugin platform flags alone do not replace the manual
-Linux Editor steps above. On Windows hosts, `Run-Phase5Verify.ps1` may soft-pass
-Linux when the player build lacks IL2CPP sysroot / Linux Mono support, after
-confirming `VstHostNative.so` PluginImporter flags.
+Linux Editor steps above. On Windows hosts, `Run-TestsAndBuildVerify.ps1` may
+soft-pass Linux when the player build lacks IL2CPP sysroot / Linux Mono support,
+after confirming `VstHostNative.so` PluginImporter flags.
 
 When linking the repo via `file:` / Git, `native~/**/build*` outputs may appear — use **Window → VST3 Host → Sanitize Extra Native Plugins**.
 

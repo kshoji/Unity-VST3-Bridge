@@ -8,7 +8,7 @@ namespace jp.kshoji.unity.vst3nativehost
     /// <summary>
     /// Node-graph DSP host driven by <see cref="OnAudioFilterRead"/>.
     /// Do not also enable <see cref="VstHostAudioFilter"/> on the same AudioSource.
-    /// V1 is a stereo DAG (see Documentation~/audio-graph-plan.md §14).
+    /// V1 is a stereo DAG (see Documentation~/audio-graph.md).
     /// </summary>
     [RequireComponent(typeof(AudioSource))]
     [DisallowMultipleComponent]

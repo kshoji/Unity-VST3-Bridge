@@ -31,9 +31,10 @@
 - Editor: **Audio Graph** window (`Window → VST3 Host → Audio Graph`) — read-only
   topology (nodes / edges / ChannelRoutes / arm status; Send & Sidechain highlighted).
   Thin `VstAudioGraph` Inspector overview + Open Window button.
-- Phase 5 polish: EditMode/PlayMode graph tests (topo / cycle / `Build*` counts),
+- EditMode/PlayMode graph tests (topo / cycle / `Build*` counts),
   Audio Graph manual matrix in [verification.md](Documentation~/verification.md),
-  `Run-Phase5Verify.ps1`, ARM64 importer detect without ARM64 player module,
+  `Run-TestsAndBuildVerify.ps1` (tests + Standalone verify builds),
+  ARM64 importer detect without ARM64 player module,
   Linux64 verify IL2CPP→Mono fallback + Windows soft-pass on plugin flags.
 
 ## 1.2.0

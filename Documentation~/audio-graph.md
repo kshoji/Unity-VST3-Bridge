@@ -64,13 +64,16 @@ Use `VstHostChannelRouteSync` to align Adapter ↔ Graph routes.
 ## Constraints (V1)
 
 - DAG only (cycles fail arm; previous snapshot kept)
-- Stereo L/R, max **32** nodes, exactly **one** Output
-- See [audio-graph-plan.md](audio-graph-plan.md) §14 for bypass / validation rules
+- Stereo L/R, max **32** nodes, exactly **one** Output, at most one ExternalIn
+- Effect: exactly one Main in; Sidechain in 0 or 1. Split / Gain: exactly one Main in
+- Instrument / ExternalIn: no inputs. Mix: ≥1 Main in
+- Bypass: Effect = copy Main × node gain (no Process); Instrument = silence; Gain = unity copy
+- Process failure on Effect: pass Main through and record diagnostics
 - Sidechain verify plugin: SDK **AGain SideChain** ([verification.md](verification.md))
 - Manual scenario matrix (Instrument / Effect / Parallel / Send / Sidechain / ExternalIn):
   [verification.md](verification.md) § Audio Graph (manual matrix)
 - Automated: `Tests/Runtime/VstAudioGraphTests.cs`;
-  `native~/windows-vst-host/Run-Phase5Verify.ps1`
+  `native~/windows-vst-host/Run-TestsAndBuildVerify.ps1`
 
 ## Editor visualization
 
