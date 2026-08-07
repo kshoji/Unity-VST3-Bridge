@@ -16,11 +16,11 @@
 2. Import sample **VST3 Host Sample**.
 3. Open `VstHostSampleScene`, Enter Play Mode.
 4. Confirm scan lists plugins, Load succeeds, **Note On** produces audio.
-5. Optional chain check: switch to **Plugin Chain**, pick Instrument + Effect, **Build Chain**, **Note On**, toggle **Bypass effect**.
-6. Optional feature demos (right panel): **Presets** A/B, **Mapping** CC simulation, **Routes** channel→slot.
+5. Optional graph check: switch to **Audio Graph**, pick Parallel→Serial / Send/Return / Sidechain, **Build Graph**, **Note On**, toggle **Bypass effect** (Sidechain: prefer **AGain SideChain**).
+6. Optional feature demos (right panel): **Presets** A/B, **Mapping** CC simulation, **Routes** (Graph instrument node ids).
 7. Confirm `Assets/MIDI` is **not** required.
 
-Expected: instrument sound through `VstHostAudioFilter` / `AudioSource` (or `VstPluginChain` in chain mode).
+Expected: instrument sound through `VstHostAudioFilter` / `AudioSource`, or `VstAudioGraph` in multi-plugin mode.
 
 For load/unload crash investigation, add scripting define **`VSTHOST_DEBUG`**
 (Player Settings) to restore `[VstHost] CreateInstance` / `DestroyInstance` traces.
@@ -141,10 +141,11 @@ Recommended workflow for **1.2.0**:
    audio / GPU environment.
 4. Open the sample scene in **Unity Linux Editor**.
 5. Load **mda DX10** (`Instrument`), Enter Play Mode, **Note On** — expect synth audio.
-6. Optional: **Plugin Chain** with Instrument + Effect, **Build Chain**, Note On,
+6. Optional: **Audio Graph** Parallel→Serial with Instrument + Effect, **Build Graph**, Note On,
    toggle Bypass.
 
-Verified path for 1.2.0: Ubuntu under VirtualBox, mda DX10 Note On + Plugin Chain.
+Verified path for 1.2.0: Ubuntu under VirtualBox, mda DX10 Note On + Plugin Chain
+(Chain removed in 1.3.0; use Audio Graph for the same check).
 
 ## IL2CPP Standalone Windows x64
 

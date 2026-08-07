@@ -108,7 +108,7 @@ hosting / Win·mac divergence). See [limitations.md](limitations.md).
 | Doc | Topic |
 |-----|--------|
 | [audio-path.md](audio-path.md) | Audio path / realtime rules |
-| [plugin-chain.md](plugin-chain.md) | Multi-plugin chain / channel routes |
+| [audio-graph.md](audio-graph.md) | Multi-plugin DAG / Send / Sidechain / channel routes |
 | [scriptable-audio.md](scriptable-audio.md) | Scriptable Audio generator + DSP MIDI |
 | [visual-scripting.md](visual-scripting.md) | Visual Scripting units / events |
 | [network-midi.md](network-midi.md) | Network MIDI → local VST |

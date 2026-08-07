@@ -21,11 +21,11 @@ gen.PluginId = pluginId;
 gen.SetupAudioSource();
 ```
 
-Do not also run `VstHostAudioFilter` / `VstPluginChain` on the same output path for the same instance.
+Do not also run `VstHostAudioFilter` / `VstAudioGraph` on the same output path for the same instance.
 
 ## DSP MIDI queue
 
-`VstHostDspMidiQueue` holds timed MIDI 1.0 short messages (`DspSample` + plugin id). Audio consumers (`VstHostGenerator`, `VstHostAudioFilter`, `VstPluginChain`) flush events with `DspSample <= blockEnd` before `Process`.
+`VstHostDspMidiQueue` holds timed MIDI 1.0 short messages (`DspSample` + plugin id). Audio consumers (`VstHostGenerator`, `VstHostAudioFilter`, `VstAudioGraph`) flush events with `DspSample <= blockEnd` before `Process`.
 
 Schedule from the main / control thread only via the queue API (or `VstHostDspMidiOutBridge`). `Schedule*` methods return `false` when the queue is full (event dropped). Overflows are counted atomically; audio consumers' `LateUpdate` call `PumpMainThreadDiagnostics` and emit a rate-limited warning on the main thread (no logging from the audio thread).
 
@@ -38,7 +38,7 @@ Implements MIDI Plugin’s `IMidiDspTimedMidiOutput`. Assign the component to:
 - `MidiDspSequenceScheduler.extraTimedMidiOutput`, or
 - `MidiDspUmpSequenceScheduler.extraTimedMidiOutput` (notes / MIDI 1.0 voice mirrored as MIDI 1.0)
 
-Wire **Target Plugin Id**, optional `VstParameterTarget`, or `VstPluginChain` for channel → instrument routing.
+Wire **Target Plugin Id**, optional `VstParameterTarget`, or `VstAudioGraph` for channel → instrument routing.
 
 ```text
 MidiDspSequenceScheduler
@@ -47,14 +47,14 @@ MidiDspSequenceScheduler
 VstHostDspMidiOutBridge → VstHostDspMidiQueue
         │
         ▼ (audio thread FlushDue)
-VstHostGenerator / VstHostAudioFilter / VstPluginChain → Process
+VstHostGenerator / VstHostAudioFilter / VstAudioGraph → Process
 ```
 
 ## Compared to `OnAudioFilterRead`
 
 | Path | Component | Timing |
 |------|-----------|--------|
-| Classic | `VstHostAudioFilter` / `VstPluginChain` | MIDI often main-thread; optional DSP queue flush |
+| Classic | `VstHostAudioFilter` / `VstAudioGraph` | MIDI often main-thread; optional DSP queue flush |
 | Scriptable Audio | `VstHostGenerator` | Same DSP queue; generator Process aligns with DSP clock |
 
 Use Scriptable Audio when sequences are already scheduled on the DSP clock (`MidiDspSequenceScheduler`).

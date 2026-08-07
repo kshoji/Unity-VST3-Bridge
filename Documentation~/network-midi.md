@@ -8,7 +8,7 @@ Requires: **`FEATURE_MIDI_PLUGIN`** + **`FEATURE_MIDI_NETWORK`**.
 
 1. Host: `MidiNetworkHub` (+ optional `MidiPlaybackSync` for SMF sync).
 2. Peer: `MidiNetworkClient` (default virtual device `network:remote`).
-3. Local VST: load instrument, `VstHostAudioFilter` / chain, `VstHostMidiAdapter.TargetPluginId`.
+3. Local VST: load instrument, `VstHostAudioFilter` / `VstAudioGraph`, `VstHostMidiAdapter.TargetPluginId`.
 4. Add **`VstHostNetworkMidiLink`** (same GameObject or linked refs) → filters the adapter to the client virtual device.
 
 ```text
@@ -21,7 +21,7 @@ MidiNetworkClient → virtual device "network:remote"
 VstHostMidiAdapter (filtered) → VST NoteOn / CC…
         │
         ▼
-VstHostAudioFilter / VstPluginChain
+VstHostAudioFilter / VstAudioGraph
 ```
 
 ## Multiplayer jam

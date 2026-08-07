@@ -10,13 +10,13 @@ intentional product boundaries, not temporary bugs.
 | Platforms | **Windows** (Editor + Standalone x64/ARM64), **macOS** (Editor + Standalone OSXUniversal via `Plugins/macOS/VstHostNative.bundle`), and **Linux** (Editor + Standalone Linux64 via `Plugins/Linux/x86_64/VstHostNative.so`). UWP not implemented. |
 | Plugin GUI | Plugin-native editors (`IPlugView` / HWND·NSView embedding) are **not** supported and **not planned**. Use `VstHostParameterPanel` or your own UI on host parameters. See below. |
 | MIDI 2.0 | UMP channel voice is **down-converted** to MIDI 1.0. High-resolution / per-note / SysEx are skipped (logged). |
-| Commercial plugins | Compatibility with arbitrary commercial `.vst3` plugins is **not guaranteed**. Smoke-tested with free/SDK samples (e.g. AGain, mda DX10). Linux Editor audio was checked with mda DX10 + Plugin Chain (Ubuntu / VirtualBox); see [verification.md](verification.md). |
+| Commercial plugins | Compatibility with arbitrary commercial `.vst3` plugins is **not guaranteed**. Smoke-tested with free/SDK samples (e.g. AGain, mda DX10). Linux Editor audio was checked with mda DX10 + multi-plugin path (Ubuntu / VirtualBox); see [verification.md](verification.md). |
 | Redistribution | Third-party `.vst3` binaries are **not** bundled. Users install plugins on their own machines. |
 | MIDI package | Unity MIDI Plugin does **not** include this host, `VstHostNative` (`.dll` / `.bundle` / `.so`), or the VST3 SDK. |
 | Process model | In-process host only. Separate-process isolation / IPC is out of scope for V1 (**将来検討**). A bad plugin can take down the Unity Editor / Player process. |
 | Native `process` faults | **Windows (MSVC):** access violations and similar faults inside `IAudioProcessor::process` may be caught via SEH and surfaced as `kVstHostErrorProcessFailed` / managed Process failure. **macOS / Linux (clang/gcc):** there is **no** SEH equivalent; a fatal fault in the plugin can **terminate the Editor or Player**. Do not expect “catch and continue” on macOS/Linux. Signal handlers that swallow faults after heap corruption are **not** used in V1 (continuing would be undefined behavior). |
 | Unload / Terminate | Waits up to **2s** for in-flight `Process` / MIDI borrowers. On timeout returns `ErrorBusy`, leaves the instance (or host) alive for a later retry — does **not** force-free while `process` may still be running. |
-| Audio path | Default: `OnAudioFilterRead` → native `process`. Optional Unity 6.3+ `VstHostGenerator` (`IAudioGenerator`). Native Audio Plugin Mixer path and ASIO/WASAPI bypass are not implemented. |
+| Audio path | Default: `OnAudioFilterRead` → native `process`. Multi-plugin: host DAG [`VstAudioGraph`](audio-graph.md) (stereo, DAG only, one Output; Send/Sidechain supported). Not Unity’s unpublished Audio Graph API. Optional Unity 6.3+ `VstHostGenerator` (`IAudioGenerator`). Native Audio Plugin Mixer path and ASIO/WASAPI / multi-device output are not implemented. |
 | Latency / threading | Buffer size and latency follow Unity DSP settings; realtime rules are documented in [audio-path.md](audio-path.md). |
 
 ## Plugin-native GUI (not planned)

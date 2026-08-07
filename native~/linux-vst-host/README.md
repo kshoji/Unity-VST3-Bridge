@@ -83,7 +83,7 @@ GUI deps (cairo / X11 / gtkmm).
 | Step | Environment |
 |------|-------------|
 | Build `.so` + native smoke | **WSL2** (or native Linux) |
-| Unity Editor / Player audio (mda DX10, Plugin Chain) | **Full Linux desktop** (e.g. VirtualBox Ubuntu) |
+| Unity Editor / Player audio (mda DX10, Audio Graph) | **Full Linux desktop** (e.g. VirtualBox Ubuntu) |
 
 WSL2 is enough to produce `Plugins/Linux/x86_64/VstHostNative.so`. Copy the
 package and `~/.vst3` plugins into the VM for Editor checks. See
