@@ -127,6 +127,7 @@ namespace jp.kshoji.unity.vst3nativehost.sample
             GUILayout.Label("Also try Editor menus (Window → VST3 Host):");
             GUILayout.Label("• Plugin Browser (category + vendor/tag)");
             GUILayout.Label("• Activity Monitor (host MIDI / params)");
+            GUILayout.Label("• Audio Graph (read-only topology)");
             GUILayout.Label("• Virtual Controller / Preset Browser");
             GUILayout.Label("• Project Settings → VST3 Host");
 

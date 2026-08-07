@@ -105,6 +105,7 @@ namespace jp.kshoji.unity.vst3nativehost.Tests
                     });
                 Assert.IsFalse(ok);
                 Assert.IsTrue(graph.HasArmedGraph); // previous snapshot retained
+                Assert.IsFalse(string.IsNullOrEmpty(graph.LastArmError));
             }
             finally
             {

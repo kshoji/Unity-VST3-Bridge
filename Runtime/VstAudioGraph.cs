@@ -84,6 +84,12 @@ namespace jp.kshoji.unity.vst3nativehost
         /// <summary>Last successful arm snapshot is active when non-null.</summary>
         public bool HasArmedGraph => Volatile.Read(ref armedSnap) != null;
 
+        /// <summary>
+        /// Last arm validation failure reason (null after a successful arm or empty graph).
+        /// On failure the previous armed snapshot is kept when one exists.
+        /// </summary>
+        public string LastArmError => lastArmError;
+
         public void ClearGraph()
         {
             nodes.Clear();
@@ -92,6 +98,7 @@ namespace jp.kshoji.unity.vst3nativehost
             Volatile.Write(ref armedSnap, null);
             armedEditVersion = editVersion;
             pendingArmWarning = null;
+            lastArmError = null;
         }
 
         /// <summary>Replace nodes/edges and arm immediately (main thread).</summary>
