@@ -7,6 +7,7 @@ Menus under **Window → VST3 Host**:
 | Plugin Browser | Scan default / extra folders, filter by name, **category**, and **vendor/tag**, Load Selected + note preview (`VstHostAudioFilter` is created automatically in Play Mode for audible preview) |
 | Preset Browser | Host programs + project `VstPresetAsset` apply/capture |
 | Activity Monitor | Live log of host MIDI / SetParameter / SetProgram (VST-side equivalent of a “MIDI Monitor VST column”) |
+| Audio Graph | Read-only topology for the selected (or scene) `VstAudioGraph`: nodes, edges (Main / Sidechain / Send), ChannelRoutes, arm status |
 | Virtual Controller | Play Mode keyboard + CC → loaded plugin (`VstHostManager`). Pick a loaded instance (e.g. after Plugin Browser Load Selected). Holds notes while keys are pressed. |
 | Sync MIDI Plugin Define | Enable `FEATURE_MIDI_PLUGIN` when `jp.kshoji.midi` is present |
 

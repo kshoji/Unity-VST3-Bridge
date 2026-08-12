@@ -30,17 +30,26 @@ Unity MIDI Plugin is **optional**. The sample runs VST-only with manual notes.
 3. Press **Note On** / **Note Off**, or use a MIDI device when MIDI + VST setup is ready.
 4. Use the parameter window to change gain / timbre.
 
-### Plugin Chain
+### Audio Graph (multi-plugin)
 
-1. Switch the toolbar to **Plugin Chain**.
-2. **Top list = Instrument** (synth such as `mda DX10` / NoiseMaker — category should include `Instrument`).
+1. Switch the toolbar to **Audio Graph**.
+2. Pick a demo row: **Parallel→Serial** / **Send/Return** / **Sidechain**.
+3. **Top list = Instrument** (synth such as `mda DX10` — category should include `Instrument`).
    **Bottom list = Effect** (e.g. `AGain` / Delay — `Fx` / Effect). Swapping these usually yields silence.
-3. Press **Build Chain** — status should look like `Chain: [1] … → [2] …`. Audio path switches to `VstPluginChain`.
-4. Press **Note On**. Toggle **Bypass effect: ON/OFF** (button under Parallel→Serial / Strict Serial) for dry vs wet.
-5. Use **Edit Instrument params** / **Edit Effect params** to switch what **VST Host Parameters** shows.
-6. Optional: **Parallel→Serial** vs **Strict Serial** mix mode.
+4. Press **Build Graph**.
+5. Press **Note On**. Toggle **Bypass effect: ON/OFF** for dry vs wet.
+   The sample sets effect **Gain≈0.25** after load (AGain default≈unity makes Bypass inaudible otherwise). Bypass ON should sound louder/fuller than OFF.
 
-If the Game view is short, scroll is not available — make the Game view taller so the Bypass / Note On row is visible.
+| Demo | What to check |
+|------|----------------|
+| Parallel→Serial | Instrument → mix → effect → out (`BuildParallel…`). Optional **Mix ExternalIn**. Bypass effect for dry. |
+| Send/Return | Dry path + send to effect → mix. Move **Send gain**; wet should rise with gain. AGain is fine if no reverb. |
+| Sidechain | Prefer effect named **AGain SideChain**. Single instrument feeds main + Aux via `BuildSidechainFromSingleSource`. |
+
+DSP MIDI queue flush is enabled on `VstAudioGraph`. Channel routes: right panel **Routes** tab (node id).
+Topology check: **Window → VST3 Host → Audio Graph** (read-only nodes / edges / arm status).
+
+If the Game view is short, make it taller so Bypass / Note On remain visible.
 
 ## Play mode — right panel (`VstHostSampleFeatureDemos`)
 
@@ -48,10 +57,10 @@ Added automatically next to the controller. Works **without** MIDI Plugin:
 
 | Tab | Demo |
 |-----|------|
-| Guide | Package overview, EventSink NoteOn/Off |
+| Guide | Package overview, EventSink NoteOn/Off, Graph path hints |
 | Presets | Host `SetProgram`, Capture/Apply/Toggle A/B state |
 | Mapping | Simulate CC / Pitch Bend → parameter (optional `VstMidiParameterMapping` asset) |
-| Routes | Edit `VstPluginChain` channel→slot routes (multi-timbral helper) |
+| Routes | Graph instrument node routes (channel → node id) |
 
 ## Optional packages
 
@@ -62,5 +71,5 @@ Added automatically next to the controller. Works **without** MIDI Plugin:
 | Visual Scripting | `FEATURE_USE_VISUALSCRIPTING` | VST3 Host units — see `Documentation~/visual-scripting.md` |
 | Unity MIDI Plugin | `FEATURE_MIDI_PLUGIN` (Sync menu) | Adapter / SMF / Network / Chunity helpers |
 
-Full verification matrix: [Documentation~/verification.md](../../Documentation~/verification.md).
-Chain details: [Documentation~/plugin-chain.md](../../Documentation~/plugin-chain.md).
+Full verification matrix: [Documentation~/verification.md](../../Documentation~/verification.md).  
+Graph: [Documentation~/audio-graph.md](../../Documentation~/audio-graph.md).

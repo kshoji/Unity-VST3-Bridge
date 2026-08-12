@@ -239,6 +239,7 @@ int main()
     }
 
     // AGain SideChain: second input bus must be bound (regression for Unity crash).
+    // ProcessWithSidechain: Aux gets real audio (AGain SideChain adds aux into the output).
     const ScannedEntry* againSide = nullptr;
     for (const auto& item : entries)
     {
@@ -259,6 +260,30 @@ int main()
             VstHost_Terminate();
             return 1;
         }
+        {
+            int32_t warmCount = 0;
+            if (VstHost_GetParameterCount(sideId, &warmCount) == kVstHostOk)
+            {
+                for (int32_t i = 0; i < warmCount; ++i)
+                {
+                    VstParamInfo warmInfo{};
+                    if (VstHost_GetParameterInfo(sideId, i, &warmInfo) != kVstHostOk)
+                        continue;
+                    (void)VstHost_SetParameterNormalized(sideId, warmInfo.id,
+                                                         warmInfo.defaultNormalized);
+                }
+            }
+        }
+        // Flush queued defaults.
+        if (VstHost_Process(sideId, inL.data(), inR.data(), outL.data(), outR.data(), kFrames)
+            != kVstHostOk)
+        {
+            printf("FAIL: Process AGain SideChain (warmup)\n");
+            VstHost_Unload(sideId);
+            VstHost_Unload(id);
+            VstHost_Terminate();
+            return 1;
+        }
         if (VstHost_Process(sideId, inL.data(), inR.data(), outL.data(), outR.data(), kFrames)
             != kVstHostOk)
         {
@@ -268,6 +293,11 @@ int main()
             VstHost_Terminate();
             return 1;
         }
+        double energySilentAux = 0.0;
+        for (int i = 0; i < kFrames; ++i)
+            energySilentAux += static_cast<double>(outL[i]) * outL[i]
+                               + static_cast<double>(outR[i]) * outR[i];
+
         if (VstHost_Process(sideId, nullptr, nullptr, outL.data(), outR.data(), kFrames)
             != kVstHostOk)
         {
@@ -277,6 +307,42 @@ int main()
             VstHost_Terminate();
             return 1;
         }
+
+        // Sidechain bus: sine at half amplitude (distinct from main).
+        std::vector<float> scL(static_cast<size_t>(kFrames));
+        std::vector<float> scR(static_cast<size_t>(kFrames));
+        for (int i = 0; i < kFrames; ++i)
+        {
+            const float s = 0.5f * std::sin(2.f * 3.14159265f * 880.f * static_cast<float>(i)
+                                            / 48000.f);
+            scL[static_cast<size_t>(i)] = s;
+            scR[static_cast<size_t>(i)] = s;
+        }
+        if (VstHost_ProcessWithSidechain(sideId, inL.data(), inR.data(), scL.data(), scR.data(),
+                                         outL.data(), outR.data(), kFrames)
+            != kVstHostOk)
+        {
+            printf("FAIL: ProcessWithSidechain AGain SideChain\n");
+            VstHost_Unload(sideId);
+            VstHost_Unload(id);
+            VstHost_Terminate();
+            return 1;
+        }
+        double energyWithSc = 0.0;
+        for (int i = 0; i < kFrames; ++i)
+            energyWithSc += static_cast<double>(outL[i]) * outL[i]
+                            + static_cast<double>(outR[i]) * outR[i];
+        printf("ProcessWithSidechain AGain SideChain energy silentAux=%.6f withSc=%.6f\n",
+               energySilentAux, energyWithSc);
+        if (!(energyWithSc > energySilentAux * 1.05))
+        {
+            printf("FAIL: ProcessWithSidechain did not increase energy vs silent Aux\n");
+            VstHost_Unload(sideId);
+            VstHost_Unload(id);
+            VstHost_Terminate();
+            return 1;
+        }
+
         VstHost_Unload(sideId);
         printf("Process AGain SideChain ok\n");
     }

@@ -26,7 +26,7 @@ namespace jp.kshoji.unity.vst3nativehost.sample
         private DemoTab tab = DemoTab.Guide;
         private VstPresetBrowser presetBrowser;
         private VstHostEventSink eventSink;
-        private VstPluginChain pluginChain;
+        private VstAudioGraph audioGraph;
         private VstHostParameterPanel parameterPanel;
         private float guiScale = 1f;
         private Vector2 scroll;
@@ -35,7 +35,7 @@ namespace jp.kshoji.unity.vst3nativehost.sample
         private float demoPitchBend = 0.5f;
         private uint mappedParameterId;
         private int routeChannel;
-        private int routeSlotIndex;
+        private int routeNodeId;
         private string status = string.Empty;
         private readonly List<VstParamInfo> parameters = new List<VstParamInfo>();
 
@@ -55,7 +55,7 @@ namespace jp.kshoji.unity.vst3nativehost.sample
             if (eventSink == null)
                 eventSink = gameObject.AddComponent<VstHostEventSink>();
 
-            pluginChain = GetComponent<VstPluginChain>();
+            audioGraph = GetComponent<VstAudioGraph>();
             parameterPanel = GetComponent<VstHostParameterPanel>();
         }
 
@@ -74,7 +74,7 @@ namespace jp.kshoji.unity.vst3nativehost.sample
 
             var prev = GUI.matrix;
             GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(guiScale, guiScale, 1f));
-            var x = 480f;
+            var x = 510f;
             GUILayout.BeginArea(new Rect(x, 12, 420f, Screen.height / guiScale - 24));
             GUILayout.BeginVertical("box");
             GUILayout.Label("Feature demos (standalone)");
@@ -127,6 +127,7 @@ namespace jp.kshoji.unity.vst3nativehost.sample
             GUILayout.Label("Also try Editor menus (Window → VST3 Host):");
             GUILayout.Label("• Plugin Browser (category + vendor/tag)");
             GUILayout.Label("• Activity Monitor (host MIDI / params)");
+            GUILayout.Label("• Audio Graph (read-only topology)");
             GUILayout.Label("• Virtual Controller / Preset Browser");
             GUILayout.Label("• Project Settings → VST3 Host");
 
@@ -135,6 +136,11 @@ namespace jp.kshoji.unity.vst3nativehost.sample
             GUILayout.Label("• Timeline → FEATURE_USE_TIMELINE (VstParameterTrack)");
             GUILayout.Label("• Input System → FEATURE_INPUT_SYSTEM (InputSystemToVstBridge)");
             GUILayout.Label("• Visual Scripting → define FEATURE_USE_VISUALSCRIPTING");
+
+            GUILayout.Space(6);
+            GUILayout.Label("Left panel paths: Single | Audio Graph.");
+            GUILayout.Label("Graph demos: Parallel→Serial, Send/Return, Sidechain (AGain SideChain).");
+            GUILayout.Label("DSP MIDI flush is on by default for Audio Graph.");
 
             GUILayout.Space(6);
             GUILayout.Label("EventSink quick test");
@@ -308,56 +314,83 @@ namespace jp.kshoji.unity.vst3nativehost.sample
 
         private void DrawRoutes()
         {
-            if (pluginChain == null)
-                pluginChain = GetComponent<VstPluginChain>();
+            if (audioGraph == null)
+                audioGraph = GetComponent<VstAudioGraph>();
 
-            GUILayout.Label("Chain channel → instrument slot (multi-timbral helper).");
-            GUILayout.Label("With MIDI: add VstHostChannelRouteSync to copy routes to Adapter.");
-
-            if (pluginChain == null || !pluginChain.enabled)
+            var useGraph = sample != null && sample.IsGraphMode && audioGraph != null && audioGraph.enabled;
+            if (!useGraph)
             {
-                GUILayout.Label("Switch left panel to Plugin Chain and Build Chain first.");
+                GUILayout.Label("Graph channel → instrument node id (multi-timbral helper).");
+                GUILayout.Label("With MIDI: add VstHostChannelRouteSync to copy routes to Adapter.");
+                GUILayout.Label("Switch left panel to Audio Graph and press Build Graph first.");
                 return;
             }
 
-            var slots = pluginChain.Slots;
-            GUILayout.Label($"Slots: {slots.Count}");
-            for (var i = 0; i < slots.Count; i++)
+            DrawGraphRoutes();
+        }
+
+        private void DrawGraphRoutes()
+        {
+            GUILayout.Label("Graph channel → instrument node id (multi-timbral helper).");
+            GUILayout.Label("Note On on the left uses ResolveInstrumentPluginId(channel).");
+
+            var instrumentNodeIds = new List<int>();
+            foreach (var n in audioGraph.Nodes)
             {
-                var s = slots[i];
-                GUILayout.Label($"  [{i}] {s.role} id={s.pluginId} gain={s.gain:0.00} bypass={s.bypass}");
+                if (n.kind == VstGraphNodeKind.Instrument && n.pluginId >= 1)
+                {
+                    instrumentNodeIds.Add(n.id);
+                    GUILayout.Label($"  node {n.id} Instrument pluginId={n.pluginId} bypass={n.bypass}");
+                }
             }
 
+            if (instrumentNodeIds.Count == 0)
+            {
+                GUILayout.Label("Build a Graph with at least one Instrument first.");
+                return;
+            }
+
+            if (routeNodeId < 1 || !instrumentNodeIds.Contains(routeNodeId))
+                routeNodeId = instrumentNodeIds[0];
+
             routeChannel = Mathf.RoundToInt(GUILayout.HorizontalSlider(routeChannel, 0, 15));
-            routeSlotIndex = Mathf.RoundToInt(GUILayout.HorizontalSlider(routeSlotIndex, 0, Mathf.Max(0, slots.Count - 1)));
-            GUILayout.Label($"Add route: ch {routeChannel} → slot {routeSlotIndex}");
+            GUILayout.Label($"Channel {routeChannel}");
+
+            GUILayout.Label("Target instrument node:");
+            for (var i = 0; i < instrumentNodeIds.Count; i++)
+            {
+                var nid = instrumentNodeIds[i];
+                if (GUILayout.Toggle(routeNodeId == nid, $"node {nid}", "Button"))
+                    routeNodeId = nid;
+            }
 
             if (GUILayout.Button("Add / replace channel route"))
             {
-                var list = pluginChain.ChannelRoutes;
-                for (var i = list.Count - 1; i >= 0; i--)
+                var list = new List<VstAudioGraph.ChannelRoute>();
+                foreach (var r in audioGraph.ChannelRoutes)
                 {
-                    if (list[i].channel == routeChannel)
-                        list.RemoveAt(i);
+                    if (r.channel != routeChannel)
+                        list.Add(r);
                 }
 
-                list.Add(new VstPluginChain.ChannelRoute
+                list.Add(new VstAudioGraph.ChannelRoute
                 {
                     channel = routeChannel,
-                    slotIndex = routeSlotIndex,
+                    nodeId = routeNodeId,
                 });
-                status = $"Route ch{routeChannel} → slot {routeSlotIndex}";
+                audioGraph.SetChannelRoutes(list);
+                status = $"Route ch{routeChannel} → node {routeNodeId}";
             }
 
             if (GUILayout.Button("Clear channel routes"))
             {
-                pluginChain.ChannelRoutes.Clear();
-                status = "Cleared channel routes";
+                audioGraph.SetChannelRoutes(System.Array.Empty<VstAudioGraph.ChannelRoute>());
+                status = "Cleared graph channel routes";
             }
 
             GUILayout.Label("Current routes:");
-            foreach (var r in pluginChain.ChannelRoutes)
-                GUILayout.Label($"  ch {r.channel} → slot {r.slotIndex}");
+            foreach (var r in audioGraph.ChannelRoutes)
+                GUILayout.Label($"  ch {r.channel} → node {r.nodeId}");
         }
 
         private void EnsureParameterList(int pluginId)

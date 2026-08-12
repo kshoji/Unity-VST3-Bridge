@@ -113,6 +113,17 @@ namespace jp.kshoji.unity.vst3nativehost
             int numFrames);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern unsafe VstHostResult VstHost_ProcessWithSidechain(
+            int id,
+            float* inputL,
+            float* inputR,
+            float* sidechainL,
+            float* sidechainR,
+            float* outputL,
+            float* outputR,
+            int numFrames);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern VstHostResult VstHost_GetParameterCount(int id, out int outCount);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]

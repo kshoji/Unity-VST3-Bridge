@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.3.0
+
+### Breaking
+- Removed **`VstPluginChain`**. Use **`VstAudioGraph`** builders instead:
+  - `SetSlots` + Parallel mix → `BuildParallelInstrumentsThenSerialEffects`
+  - `SetSlots` + StrictSerial → `BuildStrictSerial`
+  - `MixExternalInput` → `Build*(…, mixExternalInput: true)` / ExternalIn
+  - Channel routes: slot index → **instrument node id**
+  - See [Documentation~/audio-graph.md](Documentation~/audio-graph.md) migration table.
+- Removed [Documentation~/plugin-chain.md](Documentation~/plugin-chain.md) (replaced by `audio-graph.md`).
+- `VstHostChannelRouteSync` now syncs Adapter ↔ **`VstAudioGraph`**
+  (`AdapterToGraph` / `GraphToAdapter`; former Chain enum names removed).
+- `VstHostDspMidiOutBridge` routes via **`VstAudioGraph`** (not Chain).
+- `VstHostChuckEffectBridge` target **`AudioGraphExternalInput`**
+  (replaces Plugin Chain External Input).
+- Sample left panel: **Single | Audio Graph** only (Plugin Chain mode removed).
+
+### Added
+- Native `VstHost_ProcessWithSidechain` (Win / macOS / Linux shared ABI): feed Aux
+  input bus 0 with planar L/R; `VstHost_Process` unchanged (silent Aux).
+- Managed `VstHostNative.VstHost_ProcessWithSidechain` + `VstHostManager.ProcessWithSidechain`.
+- SmokeTest energy check for SDK **AGain SideChain** with real sidechain audio.
+- Docs: sidechain verify steps in [Documentation~/verification.md](Documentation~/verification.md).
+- `VstAudioGraph` (Filter / `OnAudioFilterRead`): DAG nodes (ExternalIn, Instrument,
+  Effect main/sidechain, Mix, Split, Gain, Output), arm + scratch pool, ChannelRoutes,
+  `BuildParallelInstrumentsThenSerialEffects` / `BuildStrictSerial` /
+  `BuildSendReturn` / `BuildSidechain` / `BuildSidechainFromSingleSource`.
+- Sample **Audio Graph** demos: Parallel→Serial / Send/Return / Sidechain.
+- Editor: **Audio Graph** window (`Window → VST3 Host → Audio Graph`) — read-only
+  topology (nodes / edges / ChannelRoutes / arm status; Send & Sidechain highlighted).
+  Thin `VstAudioGraph` Inspector overview + Open Window button.
+- EditMode/PlayMode graph tests (topo / cycle / `Build*` counts),
+  Audio Graph manual matrix in [verification.md](Documentation~/verification.md),
+  `Run-TestsAndBuildVerify.ps1` (tests + Standalone verify builds),
+  ARM64 importer detect without ARM64 player module,
+  Linux64 verify IL2CPP→Mono fallback + Windows soft-pass on plugin flags.
+
 ## 1.2.0
 
 ### Added
@@ -41,7 +78,7 @@
   (`FEATURE_USE_VISUALSCRIPTING` via `com.unity.visualscripting` versionDefines).
 - Network MIDI: `VstHostNetworkMidiLink` (`FEATURE_MIDI_NETWORK`).
 - Chunity: `VstHostChuckEventMidiLink`, `VstHostChuckEffectBridge`; `VstPluginChain.MixExternalInput`.
-- Docs: [Documentation~/midi-integration.md](Documentation~/midi-integration.md), [parameters.md](Documentation~/parameters.md), [timeline.md](Documentation~/timeline.md), [animator-input.md](Documentation~/animator-input.md), [editor-tools.md](Documentation~/editor-tools.md), [plugin-chain.md](Documentation~/plugin-chain.md), [scriptable-audio.md](Documentation~/scriptable-audio.md), [visual-scripting.md](Documentation~/visual-scripting.md), [network-midi.md](Documentation~/network-midi.md), [chunity.md](Documentation~/chunity.md).
+- Docs: [Documentation~/midi-integration.md](Documentation~/midi-integration.md), [parameters.md](Documentation~/parameters.md), [timeline.md](Documentation~/timeline.md), [animator-input.md](Documentation~/animator-input.md), [editor-tools.md](Documentation~/editor-tools.md), [plugin-chain.md](Documentation~/plugin-chain.md) (removed in 1.3.0 → [audio-graph.md](Documentation~/audio-graph.md)), [scriptable-audio.md](Documentation~/scriptable-audio.md), [visual-scripting.md](Documentation~/visual-scripting.md), [network-midi.md](Documentation~/network-midi.md), [chunity.md](Documentation~/chunity.md).
 - Runtime tests for mapping / preset asset helpers.
 
 ## 1.0.0

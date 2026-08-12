@@ -4,7 +4,7 @@ using UnityEngine;
 namespace jp.kshoji.unity.vst3nativehost
 {
     /// <summary>
-    /// Configures a <see cref="VstHostAudioFilter"/> (Effect) or <see cref="VstPluginChain"/>
+    /// Configures a <see cref="VstHostAudioFilter"/> (Effect) or <see cref="VstAudioGraph"/>
     /// to process upstream audio (typically Chunity <c>OnAudioFilterRead</c> on the same GameObject).
     /// Place this component / the VST filter <b>below</b> the Chuck instance in the Inspector
     /// so Unity runs Chuck first, then the VST effect.
@@ -16,13 +16,13 @@ namespace jp.kshoji.unity.vst3nativehost
         public enum TargetKind
         {
             AudioFilterEffect = 0,
-            PluginChainExternalInput = 1,
+            AudioGraphExternalInput = 1,
         }
 
         [SerializeField] private TargetKind target = TargetKind.AudioFilterEffect;
         [SerializeField] private int effectPluginId = -1;
         [SerializeField] private VstHostAudioFilter audioFilter;
-        [SerializeField] private VstPluginChain pluginChain;
+        [SerializeField] private VstAudioGraph audioGraph;
         [SerializeField] private bool applyOnEnable = true;
         [SerializeField] [Range(0f, 2f)] private float outputGain = 1f;
 
@@ -35,7 +35,7 @@ namespace jp.kshoji.unity.vst3nativehost
         private void Reset()
         {
             audioFilter = GetComponent<VstHostAudioFilter>();
-            pluginChain = GetComponent<VstPluginChain>();
+            audioGraph = GetComponent<VstAudioGraph>();
         }
 
         private void OnEnable()
@@ -53,8 +53,8 @@ namespace jp.kshoji.unity.vst3nativehost
                 if (audioFilter == null)
                     audioFilter = gameObject.AddComponent<VstHostAudioFilter>();
 
-                if (pluginChain != null)
-                    pluginChain.enabled = false;
+                if (audioGraph != null)
+                    audioGraph.enabled = false;
 
                 audioFilter.enabled = true;
                 audioFilter.Mode = VstHostAudioFilter.ProcessMode.Effect;
@@ -65,26 +65,25 @@ namespace jp.kshoji.unity.vst3nativehost
                 return;
             }
 
-            if (pluginChain == null)
-                pluginChain = GetComponent<VstPluginChain>();
-            if (pluginChain == null)
-                pluginChain = gameObject.AddComponent<VstPluginChain>();
+            if (audioGraph == null)
+                audioGraph = GetComponent<VstAudioGraph>();
+            if (audioGraph == null)
+                audioGraph = gameObject.AddComponent<VstAudioGraph>();
 
             if (audioFilter != null)
                 audioFilter.enabled = false;
 
-            pluginChain.enabled = true;
-            pluginChain.MixExternalInput = true;
-            pluginChain.OutputGain = outputGain;
+            audioGraph.enabled = true;
+            audioGraph.OutputGain = outputGain;
             if (effectPluginId >= 1)
             {
-                pluginChain.SetSlots(new[]
-                {
-                    VstPluginChain.Slot.Effect(effectPluginId),
-                });
+                audioGraph.BuildParallelInstrumentsThenSerialEffects(
+                    System.Array.Empty<int>(),
+                    new[] { effectPluginId },
+                    mixExternalInput: true);
             }
 
-            pluginChain.EnsureSilentSourcePlaying();
+            audioGraph.EnsureSilentSourcePlaying();
         }
     }
 }

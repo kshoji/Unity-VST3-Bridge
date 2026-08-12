@@ -12,7 +12,7 @@ Unity audio thread → `VstHostAudioFilter.OnAudioFilterRead` → `VstHost_Proce
 4. Set `PluginId` and `Mode` (`Instrument` or `Effect`).
 5. Send MIDI via `NoteOn` / `VstHostMidiAdapter`.
 
-For multiple plugins on one source, use [`VstPluginChain`](plugin-chain.md) instead of a single filter.
+For multiple plugins on one source, use [`VstAudioGraph`](audio-graph.md) (do not also enable `VstHostAudioFilter` on the same `AudioSource`).
 
 ## Real-time rules
 

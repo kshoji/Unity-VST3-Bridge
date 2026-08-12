@@ -74,12 +74,12 @@ Preset assets and the editor browser are documented in [parameters.md](parameter
 ### Channel filter / input router
 
 - `VstHostMidiFilterLink` — put `MidiChannelFilter` upstream of `VstHostMidiAdapter` (Adapter unregisters from MidiManager and only receives forwards).
-- `VstHostChannelRouteSync` — keep Adapter channel→plugin routes aligned with `VstPluginChain` channel→slot routes.
+- `VstHostChannelRouteSync` — keep Adapter channel→plugin routes aligned with `VstAudioGraph` channel→instrument node routes.
 - `VstHostEventSink` — UnityEvent targets for `MidiInputRouter` (also works without MIDI).
 
-## Plugin chain and Scriptable Audio
+## Audio Graph and Scriptable Audio
 
-- Multi-plugin serial / parallel mix: [plugin-chain.md](plugin-chain.md) (`VstPluginChain`).
+- Multi-plugin DAG (parallel / serial / Send / Sidechain): [audio-graph.md](audio-graph.md) (`VstAudioGraph`).
 - DSP-timed MIDI + `VstHostGenerator`: [scriptable-audio.md](scriptable-audio.md).
 
 Assign `VstHostDspMidiOutBridge` to `MidiDspSequenceScheduler.extraTimedMidiOutput` (or the UMP scheduler) so sequence notes flush into the VST process block on the DSP clock.

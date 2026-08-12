@@ -44,25 +44,29 @@ VSTHOST_SMOKE_FOLDER="$HOME/.vst3" ./build/bin/VstHostSmokeTest
 Default scan uses SDK `getModulePaths()` (`~/.vst3`, `/usr/lib/vst3`,
 `/usr/local/lib/vst3`, plus app-local `vst3`).
 
-To build Steinberg **AGain Sample Accurate** for smoke (no VSTGUI / no sudo packages):
+To build Steinberg **AGain Sample Accurate** for smoke (no VSTGUI / no sudo packages).
+Use a **persistent** build dir under `$HOME` (survives WSL reboots; `/tmp` does not):
 
 ```bash
 # From repository root
-cmake -S native~/windows-vst-host/vst3sdk -B /tmp/vst3sdk-build \
+BUILD="$HOME/vst3sdk-build"
+cmake -S native~/windows-vst-host/vst3sdk -B "$BUILD" \
   -DCMAKE_BUILD_TYPE=Release \
   -DSMTG_ENABLE_VSTGUI_SUPPORT=OFF \
   -DSMTG_ENABLE_VST3_HOSTING_EXAMPLES=OFF
-cmake --build /tmp/vst3sdk-build --target again-sample-accurate --parallel
+cmake --build "$BUILD" --target again-sample-accurate --parallel
 mkdir -p ~/.vst3
-cp -a /tmp/vst3sdk-build/VST3/Release/again-sample-accurate.vst3 ~/.vst3/
+# SMTG may already symlink into ~/.vst3; cp is only needed if that step was skipped.
+cp -a "$BUILD/VST3/Release/again-sample-accurate.vst3" ~/.vst3/ 2>/dev/null || true
 ```
 
 For **Unity Editor audio** (Note On), build SDK **mda-vst3** (includes **mda DX10**
 and other instruments). Effects alone stay silent without an audio input:
 
 ```bash
-cmake --build /tmp/vst3sdk-build --target mda-vst3 --parallel
-cp -a /tmp/vst3sdk-build/VST3/Release/mda-vst3.vst3 ~/.vst3/
+BUILD="$HOME/vst3sdk-build"
+cmake --build "$BUILD" --target mda-vst3 --parallel
+cp -a "$BUILD/VST3/Release/mda-vst3.vst3" ~/.vst3/ 2>/dev/null || true
 # Confirm Contents/x86_64-linux/mda-vst3.so exists before copying to a VM
 ```
 
@@ -83,7 +87,7 @@ GUI deps (cairo / X11 / gtkmm).
 | Step | Environment |
 |------|-------------|
 | Build `.so` + native smoke | **WSL2** (or native Linux) |
-| Unity Editor / Player audio (mda DX10, Plugin Chain) | **Full Linux desktop** (e.g. VirtualBox Ubuntu) |
+| Unity Editor / Player audio (mda DX10, Audio Graph) | **Full Linux desktop** (e.g. VirtualBox Ubuntu) |
 
 WSL2 is enough to produce `Plugins/Linux/x86_64/VstHostNative.so`. Copy the
 package and `~/.vst3` plugins into the VM for Editor checks. See

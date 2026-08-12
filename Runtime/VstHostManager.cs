@@ -379,6 +379,98 @@ namespace jp.kshoji.unity.vst3nativehost
             }
         }
 
+        /// <summary>
+        /// Like <see cref="Process"/>, but feeds Aux input bus 0 (second audio input) from
+        /// <paramref name="sidechainL"/> / <paramref name="sidechainR"/>.
+        /// Pass null sidechain buffers to behave like <see cref="Process"/> (silent Aux).
+        /// Mono Aux plugins receive L duplicated when R is null.
+        /// Audio-thread safe. Planar stereo buffers.
+        /// </summary>
+        public unsafe bool ProcessWithSidechain(
+            int pluginId,
+            float[] inputL,
+            float[] inputR,
+            float[] sidechainL,
+            float[] sidechainR,
+            float[] outputL,
+            float[] outputR,
+            int numFrames)
+        {
+            if (!initialized || outputL == null || outputR == null || numFrames <= 0)
+                return false;
+            if (outputL.Length < numFrames || outputR.Length < numFrames)
+                return false;
+            if (numFrames > BlockSize)
+                return false;
+
+            var hasMain = inputL != null && inputR != null
+                          && inputL.Length >= numFrames && inputR.Length >= numFrames;
+            var hasSide = sidechainL != null && sidechainL.Length >= numFrames;
+            if (hasSide && sidechainR != null && sidechainR.Length < numFrames)
+                return false;
+
+            fixed (float* outL = outputL)
+            fixed (float* outR = outputR)
+            {
+                if (hasMain && hasSide)
+                {
+                    fixed (float* inL = inputL)
+                    fixed (float* inR = inputR)
+                    fixed (float* scL = sidechainL)
+                    {
+                        if (sidechainR != null)
+                        {
+                            fixed (float* scR = sidechainR)
+                            {
+                                return VstHostNative.VstHost_ProcessWithSidechain(
+                                           pluginId, inL, inR, scL, scR, outL, outR, numFrames)
+                                       == VstHostResult.Ok;
+                            }
+                        }
+
+                        return VstHostNative.VstHost_ProcessWithSidechain(
+                                   pluginId, inL, inR, scL, null, outL, outR, numFrames)
+                               == VstHostResult.Ok;
+                    }
+                }
+
+                if (hasMain)
+                {
+                    fixed (float* inL = inputL)
+                    fixed (float* inR = inputR)
+                    {
+                        return VstHostNative.VstHost_ProcessWithSidechain(
+                                   pluginId, inL, inR, null, null, outL, outR, numFrames)
+                               == VstHostResult.Ok;
+                    }
+                }
+
+                if (hasSide)
+                {
+                    fixed (float* scL = sidechainL)
+                    {
+                        if (sidechainR != null)
+                        {
+                            fixed (float* scR = sidechainR)
+                            {
+                                return VstHostNative.VstHost_ProcessWithSidechain(
+                                           pluginId, null, null, scL, scR, outL, outR, numFrames)
+                                       == VstHostResult.Ok;
+                            }
+                        }
+
+                        return VstHostNative.VstHost_ProcessWithSidechain(
+                                   pluginId, null, null, scL, null, outL, outR, numFrames)
+                               == VstHostResult.Ok;
+                    }
+                }
+
+                return VstHostNative.VstHost_ProcessWithSidechain(
+                           pluginId, null, null, null, null, outL, outR, numFrames)
+                       == VstHostResult.Ok;
+            }
+        }
+
         public List<VstParamInfo> GetParameters(int pluginId)
         {
             var list = new List<VstParamInfo>();

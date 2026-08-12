@@ -39,7 +39,8 @@ PluginImporter `.meta` files are committed next to each DLL (same policy as
 | `VstHost_Load` | Load a .vst3 and create an instance (optional class UID) |
 | `VstHost_Unload` | Destroy a plugin instance (2s timeout → `kVstHostErrorBusy`, instance kept for retry) |
 | `VstHost_SendMidi1` | Enqueue MIDI 1.0 short message (mutex-serialized MPSC ring; drop-oldest on full) |
-| `VstHost_Process` | Drain MIDI → VST `process` → planar stereo float buffers |
+| `VstHost_Process` | Drain MIDI → VST `process` → planar stereo float buffers (Aux silent) |
+| `VstHost_ProcessWithSidechain` | Same, plus feed Aux input bus 0 from sidechain L/R |
 | `VstHost_GetParameterCount` / `GetParameterInfo` | Enumerate controller parameters |
 | `VstHost_Get/SetParameterNormalized` | Read/write normalized [0,1] (queues audio-thread change) |
 | `VstHost_GetProgramCount` / `GetProgramName` / `SetProgram` | Best-effort presets |

@@ -9,14 +9,14 @@
         "VST3",
         "Audio"
     ],
-    "version": "1.2.0",
+    "version": "1.3.0",
     "unity": "2022.3",
     "description": "A Unity package for hosting VST3 instruments and effects through a native bridge, with optional MIDI plugin integration.",
     "dependencies": {},
     "samples": [
         {
             "displayName": "VST3 Host Sample",
-            "description": "Scan/load VST3, Plugin Chain, Presets/Mapping/Routes demos. Works without MIDI; optional MIDI adapter when present.",
+            "description": "Scan/load VST3, Audio Graph demos (Parallel/Send/Sidechain), Presets/Mapping/Routes. Works without MIDI; optional MIDI adapter when present.",
             "path": "Samples~/VstHostSample"
         }
     ]
