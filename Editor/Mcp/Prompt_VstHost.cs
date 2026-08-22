@@ -61,5 +61,43 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                 "7. Optional: vst3-parameter-panel-setup for on-screen sliders.\n" +
                 "Prefer presets over huge vst3-state-get Base64 when possible.";
         }
+
+        [AiPrompt(Name = "vst3-midi-adapter-smoke", Role = Role.User)]
+        [Description(
+            "Phase 3: Sync MIDI define → Adapter → hardware/virtual Note → Activity (+ optional MIDI MCP).")]
+        public string MidiAdapterSmoke()
+        {
+            return
+                "VST3 + MIDI Plugin smoke (needs FEATURE_MIDI_PLUGIN / Phase 3 tools):\n" +
+                "1. vst3-features-status — confirm FEATURE_MIDI_PLUGIN + mcp-midi; if missing, Edit Mode → " +
+                "vst3-sync-midi-define then wait for domain reload.\n" +
+                "2. Play Mode → vst3-host-init → scan/load Instrument → vst3-setup-audio-filter.\n" +
+                "3. vst3-midi-adapter-setup targetPluginId=<id> allowedDeviceIds=virtual:vst3-smoke " +
+                "(or clear filter if using hardware).\n" +
+                "4. Exercise Adapter via MIDI MCP (do NOT use vst3-note-on for this step — it bypasses Adapter):\n" +
+                "   - midi-virtual-device action=register deviceId=virtual:vst3-smoke input=true\n" +
+                "   - midi-virtual-device action=inject-note-on deviceId=virtual:vst3-smoke note=60 value=100\n" +
+                "     (note is int; for names use noteName=\"C4\". Never pass a bare number into a string note param.)\n" +
+                "   - then inject-note-off with the same deviceId/note\n" +
+                "5. vst3-activity-read — expect NoteOn/NoteOff; vst3-note-off-all if stuck.\n" +
+                "Optional: vst3-smf-link then smf-player-control; vst3-channel-routes for multi-timbral.\n" +
+                "Boundary: MIDI MCP owns devices/inject/SMF; vst3-* owns Adapter/SmfLink wiring only.";
+        }
+
+        [AiPrompt(Name = "vst3-midi-learn-smoke", Role = Role.User)]
+        [Description(
+            "Phase 3: CC mapping asset → MIDI Learn → Activity SetParameter confirmation.")]
+        public string MidiLearnSmoke()
+        {
+            return
+                "MIDI Learn → parameter smoke (Play Mode, loaded plugin):\n" +
+                "1. vst3-params-list; pick a writable paramId.\n" +
+                "2. vst3-cc-mapping-create Assets/VstMcpMappings/Learn.asset " +
+                "assignToGameObject=__VstHostMcpMidi targetPluginId=<id>.\n" +
+                "3. Either vst3-midi-learn bindNow=true controller=<cc> OR arm Learn (bindNow=false) " +
+                "and send that CC from a controller / midi-send.\n" +
+                "4. Move the CC; vst3-activity-read / vst3-param-get to confirm SetParameter.\n" +
+                "5. Optional: vst3-cc-mapping-list / edit for PitchBend or 14-bit.";
+        }
     }
 }

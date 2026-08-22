@@ -38,13 +38,21 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                         $"{McpAssemblyName} (this assembly; requires com.ivanmurzak.unity.mcp >= 0.76 + UNITY_MCP_READY)",
                         null),
                     DescribeFeature(
+                        "mcp-midi",
+                        HasLoadedAssembly("jp.kshoji.unity.vst3nativehost.Mcp.Midi"),
+                        AsmOrDefine(
+                            "jp.kshoji.unity.vst3nativehost.Mcp.Midi",
+                            "FEATURE_MIDI_PLUGIN",
+                            "Phase 3 tools; needs FEATURE_MIDI_PLUGIN + UNITY_MCP_READY (vst3-sync-midi-define)"),
+                        "midi-integration.md"),
+                    DescribeFeature(
                         "FEATURE_MIDI_PLUGIN",
                         HasLoadedAssembly("jp.kshoji.unity.vst3nativehost.Midi")
                         || HasScriptingDefine("FEATURE_MIDI_PLUGIN"),
                         AsmOrDefine(
                             "jp.kshoji.unity.vst3nativehost.Midi",
                             "FEATURE_MIDI_PLUGIN",
-                            "Window/VST3 Host/Sync MIDI Plugin Define when jp.kshoji.midi is present"),
+                            "vst3-sync-midi-define or Window/VST3 Host/Sync MIDI Plugin Define when jp.kshoji.midi is present"),
                         "midi-integration.md"),
                     DescribeFeature(
                         "FEATURE_INPUT_SYSTEM",
