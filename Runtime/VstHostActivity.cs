@@ -41,12 +41,18 @@ namespace jp.kshoji.unity.vst3nativehost
     public static class VstHostActivity
     {
         private const int MidiRingCapacity = 512;
+        private const int RecentCapacity = 256;
 
         private static readonly object midiLock = new object();
         private static readonly MidiPending[] midiRing = new MidiPending[MidiRingCapacity];
         private static int midiHead;
         private static int midiTail;
         private static int midiCount;
+
+        private static readonly object recentLock = new object();
+        private static readonly VstHostActivityEntry[] recentRing = new VstHostActivityEntry[RecentCapacity];
+        private static int recentHead;
+        private static int recentCount;
 
         private static int midiFailCount;
         private static int lastMidiFailPluginId;
@@ -58,6 +64,50 @@ namespace jp.kshoji.unity.vst3nativehost
 
         public static bool Enabled { get; set; } = true;
 
+        /// <summary>Number of entries currently retained in the recent ring (0–256).</summary>
+        public static int RecentCount
+        {
+            get
+            {
+                lock (recentLock)
+                    return recentCount;
+            }
+        }
+
+        /// <summary>
+        /// Copy the most recent activity entries (oldest → newest within the returned span).
+        /// Call <see cref="PumpMainThread"/> first so deferred MIDI is flushed.
+        /// </summary>
+        public static VstHostActivityEntry[] GetRecent(int maxCount = 64)
+        {
+            if (maxCount < 1)
+                return Array.Empty<VstHostActivityEntry>();
+
+            lock (recentLock)
+            {
+                var take = Math.Min(maxCount, recentCount);
+                if (take <= 0)
+                    return Array.Empty<VstHostActivityEntry>();
+
+                var result = new VstHostActivityEntry[take];
+                var start = (recentHead + recentCount - take + RecentCapacity) % RecentCapacity;
+                for (var i = 0; i < take; i++)
+                    result[i] = recentRing[(start + i) % RecentCapacity];
+                return result;
+            }
+        }
+
+        /// <summary>Clear the recent ring used by monitors / MCP (does not disable capture).</summary>
+        public static void ClearRecent()
+        {
+            lock (recentLock)
+            {
+                recentHead = 0;
+                recentCount = 0;
+                Array.Clear(recentRing, 0, recentRing.Length);
+            }
+        }
+
         /// <summary>
         /// Main-thread preferred. Uses a thread-safe clock (not <see cref="Time.realtimeSinceStartup"/>).
         /// </summary>
@@ -65,23 +115,23 @@ namespace jp.kshoji.unity.vst3nativehost
         {
             if (!Enabled)
                 return;
-            var handler = Raised;
-            if (handler == null)
-                return;
-            handler(new VstHostActivityEntry(
+            var entry = new VstHostActivityEntry(
                 NowSeconds(),
                 kind,
                 pluginId,
-                detail));
+                detail);
+            AppendRecent(entry);
+            Raised?.Invoke(entry);
         }
 
         /// <summary>
         /// Any thread. Queues a successful MIDI send for <see cref="PumpMainThread"/>.
-        /// No-ops when capture is disabled or there are no subscribers.
+        /// No-ops when capture is disabled. Entries are retained in the recent ring even
+        /// when there are no <see cref="Raised"/> subscribers (MCP / headless).
         /// </summary>
         public static void EnqueueMidi1(int pluginId, byte status, byte data1, byte data2)
         {
-            if (!Enabled || Raised == null)
+            if (!Enabled)
                 return;
 
             lock (midiLock)
@@ -131,13 +181,6 @@ namespace jp.kshoji.unity.vst3nativehost
                 return;
             }
 
-            var handler = Raised;
-            if (handler == null)
-            {
-                ClearMidiRing();
-                return;
-            }
-
             while (true)
             {
                 MidiPending pending;
@@ -150,11 +193,29 @@ namespace jp.kshoji.unity.vst3nativehost
                     midiCount--;
                 }
 
-                handler(new VstHostActivityEntry(
+                var entry = new VstHostActivityEntry(
                     pending.TimeSeconds,
                     VstHostActivityKind.Midi1,
                     pending.PluginId,
-                    $"status=0x{pending.Status:X2} d1={pending.Data1} d2={pending.Data2}"));
+                    $"status=0x{pending.Status:X2} d1={pending.Data1} d2={pending.Data2}");
+                AppendRecent(entry);
+                Raised?.Invoke(entry);
+            }
+        }
+
+        private static void AppendRecent(in VstHostActivityEntry entry)
+        {
+            lock (recentLock)
+            {
+                if (recentCount >= RecentCapacity)
+                {
+                    recentHead = (recentHead + 1) % RecentCapacity;
+                    recentCount--;
+                }
+
+                var index = (recentHead + recentCount) % RecentCapacity;
+                recentRing[index] = entry;
+                recentCount++;
             }
         }
 

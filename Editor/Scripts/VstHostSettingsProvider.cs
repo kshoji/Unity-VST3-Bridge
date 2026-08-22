@@ -6,7 +6,7 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
 {
     /// <summary>Project-wide VST host editor preferences (scan folders, defaults).</summary>
     [FilePath("ProjectSettings/VstHostSettings.asset", FilePathAttribute.Location.ProjectFolder)]
-    internal sealed class VstHostProjectSettings : ScriptableSingleton<VstHostProjectSettings>
+    public sealed class VstHostProjectSettings : ScriptableSingleton<VstHostProjectSettings>
     {
         [SerializeField] private string[] extraScanFolders = Array.Empty<string>();
         [SerializeField] private string preferredPluginNameContains = string.Empty;
