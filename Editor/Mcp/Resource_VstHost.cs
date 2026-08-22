@@ -119,6 +119,38 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
         public ResponseResourceContent[] Settings(string uri) =>
             TextFromTool(uri, () => new Tool_VstHost().SettingsGet());
 
+        [AiResource(
+            Name = "VST3 parameters by plugin id",
+            Route = "vst3://params/{pluginId}",
+            MimeType = Consts.MimeType.TextJson,
+            ListResources = nameof(ListParamResources),
+            Description = "Parameter list for a loaded plugin instance (same as vst3-params-list).")]
+        public ResponseResourceContent[] ParamsById(string uri, string pluginId)
+        {
+            return MainThread.Instance.Run(() =>
+            {
+                if (!int.TryParse(pluginId, out var id) || id < 1)
+                {
+                    return AsArray(ResponseResourceContent.CreateText(
+                        uri,
+                        Consts.MimeType.TextJson,
+                        "{\"error\":\"invalid pluginId\"}"));
+                }
+
+                var host = jp.kshoji.unity.vst3nativehost.VstHostManager.Instance;
+                if (!host.IsInitialized || !host.LoadedPlugins.ContainsKey(id))
+                {
+                    return AsArray(ResponseResourceContent.CreateText(
+                        uri,
+                        Consts.MimeType.TextJson,
+                        $"{{\"error\":\"plugin not loaded\",\"pluginId\":{id}}}"));
+                }
+
+                var text = Tool_VstHost.FormatParamsList(id, includeHidden: false);
+                return AsArray(ResponseResourceContent.CreateText(uri, Consts.MimeType.TextJson, text));
+            });
+        }
+
         public ResponseListResource[] ListAll() =>
             new[]
             {
@@ -129,6 +161,37 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                 new ResponseListResource("vst3://diagnostics", "VST3 audio diagnostics", true, Consts.MimeType.TextJson),
                 new ResponseListResource("vst3://settings", "VST3 project settings", true, Consts.MimeType.TextJson),
             };
+
+        public ResponseListResource[] ListParamResources()
+        {
+            return MainThread.Instance.Run(() =>
+            {
+                var host = jp.kshoji.unity.vst3nativehost.VstHostManager.Instance;
+                if (!host.IsInitialized || host.LoadedPlugins.Count == 0)
+                {
+                    return new[]
+                    {
+                        new ResponseListResource(
+                            "vst3://params/0",
+                            "VST3 parameters (none loaded)",
+                            false,
+                            Consts.MimeType.TextJson),
+                    };
+                }
+
+                var list = new System.Collections.Generic.List<ResponseListResource>();
+                foreach (var id in host.LoadedPlugins.Keys)
+                {
+                    list.Add(new ResponseListResource(
+                        $"vst3://params/{id}",
+                        $"VST3 parameters pluginId={id}",
+                        true,
+                        Consts.MimeType.TextJson));
+                }
+
+                return list.ToArray();
+            });
+        }
 
         static ResponseResourceContent[] TextFromTool(string uri, Func<string> tool)
         {

@@ -215,5 +215,115 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                 : $" docs={DocsBaseUrl}{docsRelative}";
             return $"{id}: {(available ? "available" : "unavailable")} ({detail}){docs}";
         }
+
+        /// <summary>
+        /// Resolve a parameter by numeric id and/or title / shortTitle substring (case-insensitive).
+        /// Exact title match wins over partial; first partial match otherwise.
+        /// </summary>
+        internal static bool TryResolveParam(
+            int pluginId,
+            long? paramId,
+            string? title,
+            out jp.kshoji.unity.vst3nativehost.VstParamInfo info,
+            out string? error)
+        {
+            info = default;
+            error = null;
+            var list = Host.GetParameters(pluginId);
+            if (list.Count == 0)
+            {
+                error = $"[Error] No parameters for pluginId={pluginId}.";
+                return false;
+            }
+
+            if (paramId.HasValue)
+            {
+                var id = unchecked((uint)paramId.Value);
+                for (var i = 0; i < list.Count; i++)
+                {
+                    if (list[i].Id == id)
+                    {
+                        info = list[i];
+                        return true;
+                    }
+                }
+
+                error = $"[Error] paramId={id} not found on pluginId={pluginId}.";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                error = "[Error] Provide paramId or title (substring of Title/ShortTitle).";
+                return false;
+            }
+
+            var needle = title.Trim();
+            jp.kshoji.unity.vst3nativehost.VstParamInfo? exact = null;
+            jp.kshoji.unity.vst3nativehost.VstParamInfo? partial = null;
+            for (var i = 0; i < list.Count; i++)
+            {
+                var p = list[i];
+                if (string.Equals(p.Title, needle, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(p.ShortTitle, needle, StringComparison.OrdinalIgnoreCase))
+                {
+                    exact = p;
+                    break;
+                }
+
+                if (partial == null
+                    && ((p.Title != null && p.Title.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0)
+                        || (p.ShortTitle != null
+                            && p.ShortTitle.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0)))
+                {
+                    partial = p;
+                }
+            }
+
+            if (exact.HasValue)
+            {
+                info = exact.Value;
+                return true;
+            }
+
+            if (partial.HasValue)
+            {
+                info = partial.Value;
+                return true;
+            }
+
+            error = $"[Error] No parameter matching title '{needle}' on pluginId={pluginId}.";
+            return false;
+        }
+
+        /// <summary>Format parameter list for tools / resources.</summary>
+        public static string FormatParamsList(int pluginId, bool includeHidden, int max = 200)
+        {
+            var list = Host.GetParameters(pluginId);
+            var sb = new StringBuilder();
+            var shown = 0;
+            sb.Append($"pluginId={pluginId} paramCount={list.Count}");
+            for (var i = 0; i < list.Count; i++)
+            {
+                var p = list[i];
+                if (!includeHidden && (p.ParamFlags & jp.kshoji.unity.vst3nativehost.VstParamFlags.IsHidden) != 0)
+                    continue;
+                if (shown >= max)
+                {
+                    sb.Append($"\n… truncated at max={max}");
+                    break;
+                }
+
+                Host.TryGetParameterNormalized(pluginId, p.Id, out var v);
+                sb.Append('\n');
+                sb.Append(
+                    $"id={p.Id} title={p.Title} short={p.ShortTitle} units={p.Units} " +
+                    $"step={p.StepCount} default={p.DefaultNormalized:0.###} value={v:0.###} " +
+                    $"flags={p.ParamFlags} readOnly={p.IsReadOnly}");
+                shown++;
+            }
+
+            return sb.ToString();
+        }
     }
 }

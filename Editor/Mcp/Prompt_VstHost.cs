@@ -44,5 +44,22 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                 "7. vst3-activity-read — confirm MIDI reached the host.\n" +
                 "Do not assume commercial plugins are compatible; use Activity + diagnostics to isolate.";
         }
+
+        [AiPrompt(Name = "vst3-params-preset-smoke", Role = Role.User)]
+        [Description(
+            "Phase 2 smoke: list/set a parameter, create/capture/apply a VstPresetAsset, optional A/B.")]
+        public string ParamsPresetSmoke()
+        {
+            return
+                "VST3 parameter + preset smoke (after a loaded instrument in Play Mode):\n" +
+                "1. vst3-params-list for the loaded pluginId; pick a writable param (not readOnly).\n" +
+                "2. vst3-param-get then vst3-param-set (by paramId or title) to a mid value; vst3-activity-read.\n" +
+                "3. vst3-programs-list; if count>0 try vst3-set-program index=0.\n" +
+                "4. vst3-preset-create-asset path=Assets/VstMcpPresets/Smoke.asset capturePluginId=<id>.\n" +
+                "5. Change a param, then vst3-preset-apply the asset; confirm value restored via vst3-param-get.\n" +
+                "6. Optional: vst3-preset-ab capture-a → change param → capture-b → toggle.\n" +
+                "7. Optional: vst3-parameter-panel-setup for on-screen sliders.\n" +
+                "Prefer presets over huge vst3-state-get Base64 when possible.";
+        }
     }
 }
