@@ -6,7 +6,7 @@ using UnityEngine;
 namespace jp.kshoji.unity.vst3nativehost.Editor
 {
     /// <summary>
-    /// Read-only topology view for <see cref="VstAudioGraph"/> (Phase 4c).
+    /// Read-only topology view for <see cref="VstAudioGraph"/>.
     /// Wiring edits stay on Inspector lists / Build* / SetGraph.
     /// </summary>
     internal sealed class VstAudioGraphWindow : EditorWindow

@@ -60,7 +60,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
 
         [AiPrompt(Name = "vst3-params-preset-smoke", Role = Role.User)]
         [Description(
-            "Phase 2 smoke: list/set a parameter, create/capture/apply a VstPresetAsset, optional A/B.")]
+            "Parameter + preset smoke: list/set a parameter, create/capture/apply a VstPresetAsset, optional A/B.")]
         public string ParamsPresetSmoke
         (
             [Description(ArgsHint)]
@@ -92,7 +92,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
 
         [AiPrompt(Name = "vst3-midi-adapter-smoke", Role = Role.User)]
         [Description(
-            "Phase 3: Sync MIDI define → Adapter → virtual inject → Activity (0 hardware devices OK).")]
+            "MIDI: Sync define → Adapter → virtual inject → Activity (0 hardware devices OK).")]
         public string MidiAdapterSmoke
         (
             [Description(ArgsHint)]
@@ -121,7 +121,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
 
         [AiPrompt(Name = "vst3-midi-learn-smoke", Role = Role.User)]
         [Description(
-            "Phase 3: CC mapping asset → MIDI Learn → Activity SetParameter confirmation.")]
+            "CC mapping asset → MIDI Learn → Activity SetParameter confirmation.")]
         public string MidiLearnSmoke
         (
             [Description(ArgsHint)]
@@ -144,7 +144,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
 
         [AiPrompt(Name = "vst3-graph-parallel-smoke", Role = Role.User)]
         [Description(
-            "Phase 4A: parallel instruments → serial FX → status / bypass / edge gain.")]
+            "Audio Graph: parallel instruments → serial FX → status / bypass / edge gain.")]
         public string GraphParallelSmoke
         (
             [Description(ArgsHint)]
@@ -166,7 +166,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
 
         [AiPrompt(Name = "vst3-sa-dsp-midi-smoke", Role = Role.User)]
         [Description(
-            "Phase 4B (when Unity 6000.3+): SA Generator + DSP MIDI schedule.")]
+            "Scriptable Audio (when Unity 6000.3+): SA Generator + DSP MIDI schedule.")]
         public string SaDspMidiSmoke
         (
             [Description(ArgsHint)]

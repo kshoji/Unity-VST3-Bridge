@@ -19,7 +19,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
             "(MIDI Plugin, Input System, Timeline, Scriptable Audio, Chunity, Network MIDI, " +
             "Visual Scripting) by loaded assembly names and scripting defines. " +
             "Includes Documentation~ links. Safe in Edit Mode. " +
-            "Use before Phase 3/4 tools; unavailable features will not register MCP tools later.")]
+            "Call before optional MIDI / Timeline / SA tools; unavailable features will not register MCP tools.")]
         public string FeaturesStatus()
         {
             return MainThread.Instance.Run(() =>
@@ -36,14 +36,14 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                         "mcp",
                         true,
                         $"{McpAssemblyName} (this assembly; requires com.ivanmurzak.unity.mcp >= 0.76 + UNITY_MCP_READY)",
-                        null),
+                        "mcp.md"),
                     DescribeFeature(
                         "mcp-midi",
                         HasLoadedAssembly("jp.kshoji.unity.vst3nativehost.Mcp.Midi"),
                         AsmOrDefine(
                             "jp.kshoji.unity.vst3nativehost.Mcp.Midi",
                             "FEATURE_MIDI_PLUGIN",
-                            "Phase 3 tools; needs FEATURE_MIDI_PLUGIN + UNITY_MCP_READY (vst3-sync-midi-define)"),
+                            "MIDI wiring tools; needs FEATURE_MIDI_PLUGIN + UNITY_MCP_READY (vst3-sync-midi-define)"),
                         "midi-integration.md"),
                     DescribeFeature(
                         "mcp-timeline",
@@ -51,7 +51,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                         AsmOrDefine(
                             "jp.kshoji.unity.vst3nativehost.Mcp.Timeline",
                             "FEATURE_USE_TIMELINE",
-                            "Phase 4B Timeline MCP tools"),
+                            "Timeline MCP tools"),
                         "timeline.md"),
                     DescribeFeature(
                         "mcp-inputsystem",
@@ -59,7 +59,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                         AsmOrDefine(
                             "jp.kshoji.unity.vst3nativehost.Mcp.InputSystem",
                             "FEATURE_INPUT_SYSTEM",
-                            "Phase 4B Input System MCP tools"),
+                            "Input System MCP tools"),
                         "animator-input.md"),
                     DescribeFeature(
                         "mcp-scriptable-audio",
@@ -67,7 +67,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                         AsmOrDefine(
                             "jp.kshoji.unity.vst3nativehost.Mcp.ScriptableAudio",
                             "UNITY_6000_3_OR_NEWER",
-                            "Phase 4B SA Generator MCP"),
+                            "SA Generator MCP"),
                         "scriptable-audio.md"),
                     DescribeFeature(
                         "FEATURE_MIDI_PLUGIN",

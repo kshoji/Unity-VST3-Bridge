@@ -11,7 +11,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
 {
     using Consts = com.IvanMurzak.McpPlugin.Common.Consts;
 
-    /// <summary>Read-only MCP resources for VST3 host state (Phase 1).</summary>
+    /// <summary>Read-only MCP resources for VST3 host state.</summary>
     [AiResourceType]
     public partial class Resource_VstHost
     {

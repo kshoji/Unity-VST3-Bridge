@@ -21,7 +21,7 @@ https://github.com/kshoji/Unity-VST3-Bridge.git
 ## Package layout
 
 - `Runtime/` — runtime C# code
-- `Editor/` — editor-only code
+- `Editor/` — editor-only code (incl. optional `Editor/Mcp*` when Unity-MCP is present)
 - `Plugins/Windows/x86_64/` — native bridge DLL (Editor + Standalone Win64)
 - `Plugins/Windows/ARM64/` — native bridge DLL (Standalone Windows ARM64)
 - `Plugins/macOS/` — native bridge `.bundle` (Editor OSX + Standalone OSXUniversal)
@@ -47,6 +47,7 @@ https://github.com/kshoji/Unity-VST3-Bridge.git
 | [Documentation~/timeline.md](Documentation~/timeline.md) | Timeline parameter automation |
 | [Documentation~/animator-input.md](Documentation~/animator-input.md) | Animator + Input System bridges |
 | [Documentation~/editor-tools.md](Documentation~/editor-tools.md) | Editor windows / Project Settings |
+| [Documentation~/mcp.md](Documentation~/mcp.md) | Optional Unity-MCP tools (`vst3-*`) |
 | [Documentation~/verification.md](Documentation~/verification.md) | Manual / IL2CPP / isolation checks |
 | [Documentation~/limitations.md](Documentation~/limitations.md) | Known limits |
 | [Documentation~/package-excludes.md](Documentation~/package-excludes.md) | Why `native~/` (Git/file: vs `.npmignore`) |
@@ -60,7 +61,8 @@ Timeline (`FEATURE_USE_TIMELINE`) / Input System (`FEATURE_INPUT_SYSTEM`) /
 Visual Scripting / Animator bridges, audio graph + channel route sync,
 editor tools (Plugin Browser vendor/tag, Activity Monitor, Audio Graph window),
 sample scene with Presets / Mapping / Routes demos (VST-only capable),
-IL2CPP Win64 / Standalone OSX / Linux64 verify helpers, and documentation /
+IL2CPP Win64 / Standalone OSX / Linux64 verify helpers, optional Unity-MCP tools
+([Documentation~/mcp.md](Documentation~/mcp.md); Unity-MCP not bundled), and documentation /
 trademark / SDK notices are included. Linux Editor audio verified with SDK
 mda DX10 + multi-plugin path (see [Documentation~/verification.md](Documentation~/verification.md)).
 
@@ -107,6 +109,13 @@ That enables assembly `jp.kshoji.unity.vst3nativehost.Midi` and component
 Without MIDI Plugin, use manual APIs on `VstHostManager` (`NoteOn` / `NoteOff`, etc.).
 
 Audio returns via native `process` called from `OnAudioFilterRead`.
+
+## Optional Unity-MCP
+
+[Unity-MCP](https://github.com/IvanMurzak/Unity-MCP) is **not** included. When
+`com.ivanmurzak.unity.mcp` ≥ 0.76 is installed, Editor assemblies under
+`Editor/Mcp/` register `vst3-*` tools (scan / load / note / params / presets /
+graph / optional MIDI wiring). See [Documentation~/mcp.md](Documentation~/mcp.md).
 
 ## Native build / VST3 SDK
 

@@ -18,7 +18,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
             "loaded plugin count, and Play Mode. Safe in Edit Mode. " +
             "Does not call Initialize or Process. " +
             "Note: after domain reload the C# manager may report not initialized while " +
-            "native is still up — use vst3-host-init / terminate in Phase 1 to recover.")]
+            "native is still up — use vst3-host-init / terminate to recover.")]
         public string HostStatus()
         {
             return MainThread.Instance.Run(() =>

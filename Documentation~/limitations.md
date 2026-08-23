@@ -12,6 +12,7 @@ intentional product boundaries, not temporary bugs.
 | MIDI 2.0 | UMP channel voice is **down-converted** to MIDI 1.0. High-resolution / per-note / SysEx are skipped (logged). |
 | Commercial plugins | Compatibility with arbitrary commercial `.vst3` plugins is **not guaranteed**. Smoke-tested with free/SDK samples (e.g. AGain, mda DX10). Linux Editor audio was checked with mda DX10 + multi-plugin path (Ubuntu / VirtualBox); see [verification.md](verification.md). |
 | Redistribution | Third-party `.vst3` binaries are **not** bundled. Users install plugins on their own machines. |
+| Unity-MCP | Optional; **not** bundled. MCP Editor asmdefs compile only when Unity-MCP is present. See [mcp.md](mcp.md). |
 | MIDI package | Unity MIDI Plugin does **not** include this host, `VstHostNative` (`.dll` / `.bundle` / `.so`), or the VST3 SDK. |
 | Process model | In-process host only. Separate-process isolation / IPC is out of scope for V1 (**将来検討**). A bad plugin can take down the Unity Editor / Player process. |
 | Native `process` faults | **Windows (MSVC):** access violations and similar faults inside `IAudioProcessor::process` may be caught via SEH and surfaced as `kVstHostErrorProcessFailed` / managed Process failure. **macOS / Linux (clang/gcc):** there is **no** SEH equivalent; a fatal fault in the plugin can **terminate the Editor or Player**. Do not expect “catch and continue” on macOS/Linux. Signal handlers that swallow faults after heap corruption are **not** used in V1 (continuing would be undefined behavior). |

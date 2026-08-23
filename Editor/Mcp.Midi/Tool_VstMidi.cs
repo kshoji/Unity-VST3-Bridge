@@ -14,7 +14,7 @@ using UnityEngine;
 namespace jp.kshoji.unity.vst3nativehost.mcp.midi
 {
     /// <summary>
-    /// Phase 3 Unity-MCP tools for MIDI Plugin ↔ VST wiring.
+    /// Unity-MCP tools for MIDI Plugin ↔ VST wiring.
     /// Compiles only when FEATURE_MIDI_PLUGIN + Unity-MCP are present.
     /// </summary>
     [AiToolType]

@@ -131,7 +131,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
         [AiTool("vst3-send-pc", Title = "VST3 / Send Program Change")]
         [Description(
             "Send MIDI Program Change (not host SetProgram). Play Mode required. " +
-            "For host program lists use Phase 2 vst3-set-program.")]
+            "For host program lists use vst3-set-program.")]
         public string SendPc
         (
             [Description("Plugin instance id.")]
