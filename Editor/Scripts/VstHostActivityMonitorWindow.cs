@@ -64,7 +64,10 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
         {
             EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
             if (GUILayout.Button("Clear", EditorStyles.toolbarButton, GUILayout.Width(50)))
+            {
                 lines.Clear();
+                VstHostActivity.ClearRecent();
+            }
             paused = GUILayout.Toggle(paused, paused ? "Resume" : "Pause", EditorStyles.toolbarButton, GUILayout.Width(60));
             VstHostActivity.Enabled = GUILayout.Toggle(
                 VstHostActivity.Enabled, "Capture", EditorStyles.toolbarButton, GUILayout.Width(60));

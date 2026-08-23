@@ -90,3 +90,9 @@ Assign `VstHostDspMidiOutBridge` to `MidiDspSequenceScheduler.extraTimedMidiOutp
 - [network-midi.md](network-midi.md)
 - [chunity.md](chunity.md)
 
+## Optional Unity-MCP
+
+With Unity-MCP installed, Adapter / SmfLink / CC mapping / Learn can be driven via
+`vst3-midi-adapter-setup`, `vst3-smf-link`, `vst3-cc-mapping-*`, `vst3-midi-learn`, etc.
+Device I/O stays on MIDI MCP (`midi-*`). Details: [mcp.md](mcp.md).
+

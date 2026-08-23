@@ -28,3 +28,11 @@ delivered on the main thread via `VstHostActivity.PumpMainThread` (device callba
 Virtual MIDI Controller (**Window → MIDI → Virtual Controller**) still works when
 routing through `VstHostMidiAdapter`; the VST Virtual Controller talks to the host API directly
 and does not require the MIDI package.
+
+## Optional Unity-MCP
+
+When [Unity-MCP](https://github.com/IvanMurzak/Unity-MCP) (`com.ivanmurzak.unity.mcp` ≥ 0.76)
+is installed, the same workflows are available as `vst3-*` tools (Plugin Browser ≈ scan/load,
+Activity Monitor ≈ `vst3-activity-read`, Sync Define ≈ `vst3-sync-midi-define`, etc.).
+Unity-MCP is **not** shipped with this package. Full tool list and Play Mode rules:
+[mcp.md](mcp.md).

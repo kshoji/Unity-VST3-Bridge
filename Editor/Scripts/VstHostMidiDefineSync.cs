@@ -13,9 +13,9 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
     /// so asmdef <c>versionDefines</c> cannot gate the optional adapter assembly.
     /// </summary>
     [InitializeOnLoad]
-    static class VstHostMidiDefineSync
+    public static class VstHostMidiDefineSync
     {
-        internal const string DefineSymbol = "FEATURE_MIDI_PLUGIN";
+        public const string DefineSymbol = "FEATURE_MIDI_PLUGIN";
 
         static VstHostMidiDefineSync()
         {
@@ -31,7 +31,8 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
                 : $"[VstHost] {DefineSymbol} cleared (jp.kshoji.midi.asmdef not found).");
         }
 
-        internal static void SyncDefines()
+        /// <summary>Public entry for MCP / tooling. No-ops while entering Play Mode.</summary>
+        public static void SyncDefines()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode)
                 return;
@@ -54,6 +55,20 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
                     // Obsolete / unsupported groups throw; ignore.
                 }
             }
+        }
+
+        /// <summary>True when <c>jp.kshoji.midi.asmdef</c> is present in the project.</summary>
+        public static bool HasMidiAsmdef()
+        {
+            var guids = AssetDatabase.FindAssets("jp.kshoji.midi t:asmdef");
+            foreach (var guid in guids)
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                if (path.EndsWith("jp.kshoji.midi.asmdef", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
         }
 
         static void ApplyForGroup(BuildTargetGroup group, bool shouldHave)
@@ -90,19 +105,6 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
 #else
             PlayerSettings.SetScriptingDefineSymbolsForGroup(group, joined);
 #endif
-        }
-
-        static bool HasMidiAsmdef()
-        {
-            var guids = AssetDatabase.FindAssets("jp.kshoji.midi t:asmdef");
-            foreach (var guid in guids)
-            {
-                var path = AssetDatabase.GUIDToAssetPath(guid);
-                if (path.EndsWith("jp.kshoji.midi.asmdef", StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-
-            return false;
         }
     }
 }

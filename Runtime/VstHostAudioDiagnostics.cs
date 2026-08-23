@@ -18,6 +18,10 @@ namespace jp.kshoji.unity.vst3nativehost
         private static int lastBufferCapacityClipFrames;
         private static int lastBufferCapacity;
 
+        private static int lifetimeProcessFail;
+        private static int lifetimeBlockSizeSkip;
+        private static int lifetimeBufferCapacityClip;
+
         private static int processFailSinceWarn;
         private static int blockSizeSkipSinceWarn;
         private static int bufferCapacityClipSinceWarn;
@@ -27,6 +31,7 @@ namespace jp.kshoji.unity.vst3nativehost
         public static void RecordProcessFail()
         {
             Interlocked.Increment(ref processFailCount);
+            Interlocked.Increment(ref lifetimeProcessFail);
         }
 
         /// <summary>
@@ -36,6 +41,7 @@ namespace jp.kshoji.unity.vst3nativehost
         public static void RecordBlockSizeSkip(int frames, int blockSize)
         {
             Interlocked.Increment(ref blockSizeSkipCount);
+            Interlocked.Increment(ref lifetimeBlockSizeSkip);
             Interlocked.Exchange(ref lastBlockSizeSkipFrames, frames);
             Interlocked.Exchange(ref lastBlockSizeSkipLimit, blockSize);
         }
@@ -47,8 +53,38 @@ namespace jp.kshoji.unity.vst3nativehost
         public static void RecordBufferCapacityClip(int requestedFrames, int capacity)
         {
             Interlocked.Increment(ref bufferCapacityClipCount);
+            Interlocked.Increment(ref lifetimeBufferCapacityClip);
             Interlocked.Exchange(ref lastBufferCapacityClipFrames, requestedFrames);
             Interlocked.Exchange(ref lastBufferCapacity, capacity);
+        }
+
+        /// <summary>
+        /// Lifetime counters since last <see cref="ClearLifetime"/> (not cleared by pump warnings).
+        /// </summary>
+        public static void Snapshot(
+            out int processFail,
+            out int blockSizeSkip,
+            out int bufferCapacityClip,
+            out int lastSkipFrames,
+            out int lastSkipLimit,
+            out int lastClipFrames,
+            out int lastClipCapacity)
+        {
+            processFail = Volatile.Read(ref lifetimeProcessFail);
+            blockSizeSkip = Volatile.Read(ref lifetimeBlockSizeSkip);
+            bufferCapacityClip = Volatile.Read(ref lifetimeBufferCapacityClip);
+            lastSkipFrames = Volatile.Read(ref lastBlockSizeSkipFrames);
+            lastSkipLimit = Volatile.Read(ref lastBlockSizeSkipLimit);
+            lastClipFrames = Volatile.Read(ref lastBufferCapacityClipFrames);
+            lastClipCapacity = Volatile.Read(ref lastBufferCapacity);
+        }
+
+        /// <summary>Reset lifetime counters used by MCP / tooling.</summary>
+        public static void ClearLifetime()
+        {
+            Interlocked.Exchange(ref lifetimeProcessFail, 0);
+            Interlocked.Exchange(ref lifetimeBlockSizeSkip, 0);
+            Interlocked.Exchange(ref lifetimeBufferCapacityClip, 0);
         }
 
         /// <summary>Main thread only. Safe to call from multiple LateUpdates.</summary>

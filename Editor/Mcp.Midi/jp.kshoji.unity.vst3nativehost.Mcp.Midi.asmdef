@@ -1,0 +1,35 @@
+{
+    "name": "jp.kshoji.unity.vst3nativehost.Mcp.Midi",
+    "rootNamespace": "jp.kshoji.unity.vst3nativehost.mcp.midi",
+    "references": [
+        "jp.kshoji.unity.vst3nativehost.Runtime",
+        "jp.kshoji.unity.vst3nativehost.Editor",
+        "jp.kshoji.unity.vst3nativehost.Midi",
+        "jp.kshoji.midi"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "McpPlugin.dll",
+        "McpPlugin.Common.dll",
+        "ReflectorNet.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "FEATURE_MIDI_PLUGIN",
+        "FEATURE_UNITY_MCP",
+        "UNITY_MCP_READY"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.ivanmurzak.unity.mcp",
+            "expression": "0.76.0",
+            "define": "FEATURE_UNITY_MCP"
+        }
+    ],
+    "noEngineReferences": false
+}

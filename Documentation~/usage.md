@@ -89,6 +89,8 @@ CC→parameter mapping, `SmfPlayer` link, and presets:
 Timeline / Animator / Input System / editor tools:
 [timeline.md](timeline.md), [animator-input.md](animator-input.md), [editor-tools.md](editor-tools.md).
 
+Optional Unity-MCP (`vst3-*` tools): [mcp.md](mcp.md). Unity-MCP is not bundled.
+
 Do **not** register VST routing in MIDI core `midi2Plugins`; keep routing in
 this package.
 
@@ -118,6 +120,7 @@ hosting / Win·mac divergence). See [limitations.md](limitations.md).
 | [timeline.md](timeline.md) | Timeline parameter automation |
 | [animator-input.md](animator-input.md) | Animator + Input System |
 | [editor-tools.md](editor-tools.md) | Editor windows / Project Settings |
+| [mcp.md](mcp.md) | Optional Unity-MCP tools |
 | [limitations.md](limitations.md) | Known limits |
 | [package-excludes.md](package-excludes.md) | Why `native~/` stays out of UPM installs |
 | [NOTICE.md](../NOTICE.md) (repo root) | Trademark / SDK / distribution |

@@ -1,5 +1,41 @@
 # Changelog
 
+## 1.4.0
+
+### Added
+- Optional Unity-MCP tools: `Editor/Mcp/` asmdef
+  `jp.kshoji.unity.vst3nativehost.Mcp` (compiles only when
+  `com.ivanmurzak.unity.mcp` ≥ 0.76 and `UNITY_MCP_READY`). Unity-MCP is not bundled.
+  - Core: `vst3-ping`, `features-status`, `host-status`, host init/terminate, scan,
+    settings, load/unload, audio filter, note/CC/PC/pitch/aftertouch/midi1,
+    note-off-all, validate, verify-platforms, activity read/clear/enable,
+    diagnostics-read, `sync-midi-define`, `event-sink-setup`,
+    `animator-setup`, `dsp-midi-schedule`, `vs-register`
+  - Params / presets: params-list/get/set, programs-list/set-program, state-get/set,
+    preset create/capture/apply/list/ab, parameter-panel-setup
+  - MIDI wiring (`Editor/Mcp.Midi/`, `FEATURE_MIDI_PLUGIN`): adapter-setup, smf-link,
+    cc-mapping create/list/edit, midi-learn, channel-routes, filter-link, route-sync
+  - Audio Graph: status/clear/build-*/set/connect/bypass/gains/channel-routes/arm
+  - Optional integrations: `Mcp.Timeline`, `Mcp.InputSystem`, `Mcp.ScriptableAudio`,
+    `Mcp.ScriptableAudio.Midi`, `Mcp.Midi.Chunity`, `Mcp.Midi.Network`
+  - Resources: `vst3://features|scanned|instances|activity/recent|diagnostics|settings|params/{id}|graph/{object}`
+  - Prompts: `vst3-quick-start-note`, `vst3-validate-troubleshoot`, `vst3-params-preset-smoke`,
+    `vst3-midi-adapter-smoke`, `vst3-midi-learn-smoke`, `vst3-graph-parallel-smoke`,
+    `vst3-sa-dsp-midi-smoke`
+  - Docs: [Documentation~/mcp.md](Documentation~/mcp.md)
+- `VstHostActivity` recent ring (`GetRecent` / `ClearRecent`); capture without
+  Activity Monitor subscribers.
+- `VstHostAudioDiagnostics.Snapshot` / `ClearLifetime` lifetime counters.
+- `VstHostProjectSettings` made public for MCP / tooling.
+- `VstHostMidiDefineSync` public API for MCP define sync.
+- MCP smoke feedback: prompts use exact tools/list names + virtual inject path;
+  `vst3-params-list preferAutomate`; `vst3-preset-create-asset overwrite`;
+  `vst3-validate` reports `__VstHostMcpAudio`; Adapter/Mapper + Activity dedupe
+  MIDI1+MIDI2 dual-dispatch duplicates.
+- `vst3-preset-ab`: Success reports slot bytes/sha8/slotsEqual/applied/preferSlotB;
+  Warning when slotsEqual; optional silent Process flush before capture;
+  `SetState` raises Activity (apply/toggle visible in activity-read).
+
 ## 1.3.0
 
 ### Breaking
