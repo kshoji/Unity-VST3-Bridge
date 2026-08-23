@@ -79,10 +79,6 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                 if (!Host.SetState(pluginId, blob))
                     return $"[Error] vst3-state-set failed pluginId={pluginId} bytes={blob.Length}";
 
-                Activity.Raise(
-                    jp.kshoji.unity.vst3nativehost.VstHostActivityKind.State,
-                    pluginId,
-                    $"stateBytes={blob.Length}");
                 Activity.PumpMainThread();
                 return $"[Success] vst3-state-set pluginId={pluginId} bytes={blob.Length}";
             });

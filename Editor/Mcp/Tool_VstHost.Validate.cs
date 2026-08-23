@@ -46,13 +46,29 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                 var filters = Object.FindObjectsOfType<Filter>();
 #endif
                 sb.Append($"\naudioFilterCount={filters.Length}");
+                Filter? mcpFilter = null;
                 for (var i = 0; i < filters.Length; i++)
                 {
                     var f = filters[i];
+                    if (f != null && f.gameObject.name == DefaultAudioObjectName)
+                        mcpFilter = f;
                     var src = f.GetComponent<AudioSource>();
                     sb.Append(
                         $"\n  filter[{i}] go={f.gameObject.name} pluginId={f.PluginId} mode={f.Mode} " +
                         $"gain={f.OutputGain} audioSource={(src != null)} playing={(src != null && src.isPlaying)}");
+                }
+
+                if (mcpFilter != null)
+                {
+                    var src = mcpFilter.GetComponent<AudioSource>();
+                    sb.Append(
+                        $"\nmcpAudioFilter={DefaultAudioObjectName} pluginId={mcpFilter.PluginId} " +
+                        $"mode={mcpFilter.Mode} playing={(src != null && src.isPlaying)}");
+                }
+                else
+                {
+                    sb.Append($"\nmcpAudioFilter={DefaultAudioObjectName} present=false " +
+                              "(call vst3-setup-audio-filter to create)");
                 }
 
                 if (!IsPlayMode)
@@ -61,6 +77,8 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                     sb.Append("\nhint=No loaded instances — vst3-scan then vst3-load");
                 if (IsPlayMode && filters.Length == 0 && Host.LoadedPlugins.Count > 0)
                     sb.Append("\nhint=Loaded plugins have no VstHostAudioFilter — vst3-setup-audio-filter");
+                if (IsPlayMode && mcpFilter == null && Host.LoadedPlugins.Count > 0)
+                    sb.Append($"\nhint=No {DefaultAudioObjectName} — vst3-setup-audio-filter creates it");
 
                 sb.Append($"\ndocs={DocsBaseUrl}verification.md");
                 return sb.ToString();

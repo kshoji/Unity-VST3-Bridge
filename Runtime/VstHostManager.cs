@@ -588,6 +588,8 @@ namespace jp.kshoji.unity.vst3nativehost
                 Debug.LogWarning($"[VstHost] SetState failed id={pluginId}: {result}");
                 return false;
             }
+
+            VstHostActivity.Raise(VstHostActivityKind.State, pluginId, $"stateBytes={state.Length}");
             return true;
         }
 

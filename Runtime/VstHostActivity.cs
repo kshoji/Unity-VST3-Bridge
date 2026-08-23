@@ -207,6 +207,19 @@ namespace jp.kshoji.unity.vst3nativehost
         {
             lock (recentLock)
             {
+                if (recentCount > 0)
+                {
+                    var lastIndex = (recentHead + recentCount - 1 + RecentCapacity) % RecentCapacity;
+                    var last = recentRing[lastIndex];
+                    if (last.Kind == entry.Kind
+                        && last.PluginId == entry.PluginId
+                        && last.Detail == entry.Detail
+                        && entry.TimeSeconds - last.TimeSeconds < 0.002)
+                    {
+                        return;
+                    }
+                }
+
                 if (recentCount >= RecentCapacity)
                 {
                     recentHead = (recentHead + 1) % RecentCapacity;

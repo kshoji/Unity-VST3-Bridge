@@ -297,30 +297,75 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
         }
 
         /// <summary>Format parameter list for tools / resources.</summary>
-        public static string FormatParamsList(int pluginId, bool includeHidden, int max = 200)
+        public static string FormatParamsList(
+            int pluginId,
+            bool includeHidden,
+            int max = 200,
+            bool preferAutomate = false)
         {
             var list = Host.GetParameters(pluginId);
             var sb = new StringBuilder();
             var shown = 0;
-            sb.Append($"pluginId={pluginId} paramCount={list.Count}");
+            sb.Append($"pluginId={pluginId} paramCount={list.Count} preferAutomate={preferAutomate}");
+
+            void AppendOne(jp.kshoji.unity.vst3nativehost.VstParamInfo p, bool suggested)
+            {
+                if (shown >= max)
+                    return;
+                Host.TryGetParameterNormalized(pluginId, p.Id, out var v);
+                sb.Append('\n');
+                if (suggested)
+                    sb.Append("suggested ");
+                sb.Append(
+                    $"id={p.Id} title={p.Title} short={p.ShortTitle} units={p.Units} " +
+                    $"step={p.StepCount} default={p.DefaultNormalized:0.###} value={v:0.###} " +
+                    $"flags={p.ParamFlags} readOnly={p.IsReadOnly}");
+                shown++;
+            }
+
+            bool IsPreferred(jp.kshoji.unity.vst3nativehost.VstParamInfo p)
+            {
+                if (p.IsReadOnly)
+                    return false;
+                var flags = p.ParamFlags;
+                if ((flags & jp.kshoji.unity.vst3nativehost.VstParamFlags.IsProgramChange) != 0)
+                    return false;
+                if ((flags & jp.kshoji.unity.vst3nativehost.VstParamFlags.IsList) != 0 && p.StepCount > 1)
+                    return false;
+                return (flags & jp.kshoji.unity.vst3nativehost.VstParamFlags.CanAutomate) != 0;
+            }
+
+            if (preferAutomate)
+            {
+                for (var i = 0; i < list.Count && shown < max; i++)
+                {
+                    var p = list[i];
+                    if (!includeHidden && (p.ParamFlags & jp.kshoji.unity.vst3nativehost.VstParamFlags.IsHidden) != 0)
+                        continue;
+                    if (!IsPreferred(p))
+                        continue;
+                    AppendOne(p, suggested: true);
+                }
+
+                if (shown == 0)
+                    sb.Append("\n(no preferred automate params; listing all non-hidden)");
+            }
+
+            var suggestedCount = shown;
             for (var i = 0; i < list.Count; i++)
             {
                 var p = list[i];
                 if (!includeHidden && (p.ParamFlags & jp.kshoji.unity.vst3nativehost.VstParamFlags.IsHidden) != 0)
                     continue;
+                if (preferAutomate && suggestedCount > 0 && IsPreferred(p))
+                    continue; // already listed as suggested
                 if (shown >= max)
                 {
                     sb.Append($"\n… truncated at max={max}");
                     break;
                 }
 
-                Host.TryGetParameterNormalized(pluginId, p.Id, out var v);
-                sb.Append('\n');
-                sb.Append(
-                    $"id={p.Id} title={p.Title} short={p.ShortTitle} units={p.Units} " +
-                    $"step={p.StepCount} default={p.DefaultNormalized:0.###} value={v:0.###} " +
-                    $"flags={p.ParamFlags} readOnly={p.IsReadOnly}");
-                shown++;
+                AppendOne(p, suggested: false);
             }
 
             return sb.ToString();

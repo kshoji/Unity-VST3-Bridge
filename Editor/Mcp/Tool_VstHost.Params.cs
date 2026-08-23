@@ -14,6 +14,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
             ReadOnlyHint = true)]
         [Description(
             "List VST3 parameters for a loaded plugin (id, title, units, stepCount, flags, current normalized value). " +
+            "preferAutomate=true lists CanAutomate continuous params first (skips ProgramChange / readOnly). " +
             "Requires loaded instance. Edit Mode OK when host is initialized.")]
         public string ParamsList
         (
@@ -21,6 +22,8 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
             int pluginId,
             [Description("Include hidden parameters.")]
             bool includeHidden = false,
+            [Description("Prefer CanAutomate, non-programChange, non-readOnly params first (smoke-test friendly).")]
+            bool preferAutomate = false,
             [Description("Max parameters to print.")]
             int maxResults = 200
         )
@@ -30,7 +33,9 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                 if (!TryRequireLoaded("vst3-params-list", pluginId, out var error))
                     return error!;
 
-                return $"[Success] vst3-params-list\n{FormatParamsList(pluginId, includeHidden, maxResults)}";
+                return
+                    $"[Success] vst3-params-list preferAutomate={preferAutomate}\n" +
+                    FormatParamsList(pluginId, includeHidden, maxResults, preferAutomate);
             });
         }
 

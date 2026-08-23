@@ -198,9 +198,41 @@ namespace jp.kshoji.unity.vst3nativehost
             return pluginId >= 1;
         }
 
-        private static void Send(int pluginId, byte status, byte data1, byte data2)
+        private void Send(int pluginId, byte status, byte data1, byte data2)
         {
+            // MidiManager classic path invokes both IMidi1* and IMidi2* handlers for the same
+            // short message; skip the duplicate within a short window.
+            if (IsDuplicateSend(pluginId, status, data1, data2))
+                return;
             VstHostManager.Instance.SendMidi1(pluginId, status, data1, data2);
+        }
+
+        private int lastSendPluginId = -1;
+        private byte lastSendStatus;
+        private byte lastSendData1;
+        private byte lastSendData2;
+        private double lastSendTime = -1;
+
+        private bool IsDuplicateSend(int pluginId, byte status, byte data1, byte data2)
+        {
+            var now = (double)System.Diagnostics.Stopwatch.GetTimestamp()
+                      / System.Diagnostics.Stopwatch.Frequency;
+            if (pluginId == lastSendPluginId
+                && status == lastSendStatus
+                && data1 == lastSendData1
+                && data2 == lastSendData2
+                && lastSendTime >= 0
+                && now - lastSendTime < 0.002)
+            {
+                return true;
+            }
+
+            lastSendPluginId = pluginId;
+            lastSendStatus = status;
+            lastSendData1 = data1;
+            lastSendData2 = data2;
+            lastSendTime = now;
+            return false;
         }
 
         // --- MIDI 1.0 (UMP message type 2 / classic handlers) ---

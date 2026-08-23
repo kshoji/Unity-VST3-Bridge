@@ -6,6 +6,7 @@ using com.IvanMurzak.McpPlugin;
 using com.IvanMurzak.ReflectorNet.Utils;
 using UnityEditor;
 using UnityEngine;
+using Activity = jp.kshoji.unity.vst3nativehost.VstHostActivity;
 using PresetAsset = jp.kshoji.unity.vst3nativehost.VstPresetAsset;
 using PresetBrowser = jp.kshoji.unity.vst3nativehost.VstPresetBrowser;
 using ParamPanel = jp.kshoji.unity.vst3nativehost.VstHostParameterPanel;
@@ -16,16 +17,18 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
     {
         [AiTool("vst3-preset-create-asset", Title = "VST3 / Preset Create Asset")]
         [Description(
-            "Create a VstPresetAsset at the given project path (Assets/... .asset). " +
-            "Does not capture state unless capturePluginId is set.")]
+            "Create or upsert a VstPresetAsset at the given project path (Assets/... .asset). " +
+            "Does not capture state unless capturePluginId is set. overwrite=true replaces an existing asset.")]
         public string PresetCreateAsset
         (
             [Description("Asset path e.g. Assets/Presets/MyPreset.asset")]
             string assetPath,
             [Description("Optional display name.")]
             string? displayName = null,
-            [Description("If >0, CaptureFrom this plugin id after create.")]
-            int capturePluginId = 0
+            [Description("If >0, CaptureFrom this plugin id after create/overwrite.")]
+            int capturePluginId = 0,
+            [Description("When true, reuse/overwrite an existing asset at the path (smoke-test friendly).")]
+            bool overwrite = false
         )
         {
             if (string.IsNullOrWhiteSpace(assetPath))
@@ -42,35 +45,48 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                 var dir = Path.GetDirectoryName(path)?.Replace('\\', '/');
                 if (!string.IsNullOrEmpty(dir) && !AssetDatabase.IsValidFolder(dir))
                 {
-                    // Create nested folders under Assets/
                     EnsureAssetFolder(dir);
                 }
 
                 var existing = AssetDatabase.LoadAssetAtPath<PresetAsset>(path);
+                PresetAsset preset;
+                var reused = false;
                 if (existing != null)
-                    return $"[Error] vst3-preset-create-asset: asset already exists at {path}";
+                {
+                    if (!overwrite)
+                        return $"[Error] vst3-preset-create-asset: asset already exists at {path} (set overwrite=true).";
+                    preset = existing;
+                    reused = true;
+                }
+                else
+                {
+                    preset = ScriptableObject.CreateInstance<PresetAsset>();
+                    AssetDatabase.CreateAsset(preset, path);
+                }
 
-                var preset = ScriptableObject.CreateInstance<PresetAsset>();
                 if (!string.IsNullOrWhiteSpace(displayName))
                     preset.DisplayName = displayName.Trim();
-
-                AssetDatabase.CreateAsset(preset, path);
 
                 if (capturePluginId >= 1)
                 {
                     if (!TryRequireLoaded("vst3-preset-create-asset", capturePluginId, out var loadErr))
                     {
+                        EditorUtility.SetDirty(preset);
                         AssetDatabase.SaveAssets();
-                        return loadErr + $" (asset created at {path} without capture)";
+                        return loadErr + $" (asset at {path} without capture reused={reused})";
                     }
 
                     if (!preset.CaptureFrom(capturePluginId, displayName))
                     {
                         EditorUtility.SetDirty(preset);
                         AssetDatabase.SaveAssets();
-                        return $"[Error] asset created at {path} but CaptureFrom failed for id={capturePluginId}";
+                        return $"[Error] asset at {path} but CaptureFrom failed for id={capturePluginId}";
                     }
 
+                    EditorUtility.SetDirty(preset);
+                }
+                else if (reused)
+                {
                     EditorUtility.SetDirty(preset);
                 }
 
@@ -78,7 +94,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                 AssetDatabase.Refresh();
                 return
                     $"[Success] vst3-preset-create-asset path={path} hasState={preset.HasState} " +
-                    $"displayName={preset.DisplayName}";
+                    $"displayName={preset.DisplayName} overwritten={reused}";
             });
         }
 
@@ -202,8 +218,11 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
 
         [AiTool("vst3-preset-ab", Title = "VST3 / Preset A/B")]
         [Description(
-            "A/B capture/restore/toggle via VstPresetBrowser on a GameObject. " +
-            "action: capture-a|capture-b|apply-a|apply-b|toggle. Play Mode recommended.")]
+            "A/B capture/restore/toggle via VstPresetBrowser. " +
+            "action: capture-a|capture-b|apply-a|apply-b|toggle. " +
+            "Success includes slotABytes/slotBBytes/sha8/slotsEqual/preferSlotB/applied. " +
+            "Param changes may lag in GetState until audio Process — flushProcessBeforeCapture " +
+            "(default true on capture) runs one silent block. Play Mode recommended.")]
         public string PresetAb
         (
             [Description("Loaded plugin instance id.")]
@@ -213,7 +232,11 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
             [Description("GameObject name. Empty = __VstHostMcpAudio.")]
             string? gameObjectName = null,
             [Description("When true, show the floating IMGUI browser.")]
-            bool showGui = false
+            bool showGui = false,
+            [Description(
+                "On capture-*: run one silent Process block before GetState so controller changes " +
+                "reach the component state chunk. Default true.")]
+            bool flushProcessBeforeCapture = true
         )
         {
             if (string.IsNullOrWhiteSpace(action))
@@ -243,6 +266,12 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                 browser.RefreshPrograms();
 
                 var act = action.Trim().ToLowerInvariant();
+                var isCapture = act is "capture-a" or "capturea" or "a" or "capture-b" or "captureb" or "b";
+                var flushed = false;
+                if (isCapture && flushProcessBeforeCapture)
+                    flushed = TryFlushProcessForState(pluginId);
+
+                string? applied = null;
                 var ok = act switch
                 {
                     "capture-a" or "capturea" or "a" => browser.CaptureToSlotA(),
@@ -261,10 +290,41 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                         "[Error] vst3-preset-ab: action must be capture-a|capture-b|apply-a|apply-b|toggle.";
                 }
 
-                return ok
-                    ? $"[Success] vst3-preset-ab action={act} pluginId={pluginId} gameObject={name}"
-                    : $"[Error] vst3-preset-ab action={act} failed (empty slot or SetState error).";
+                if (ok && act is "apply-a" or "restore-a" or "restorea" or "apply-b" or "restore-b"
+                    or "restoreb" or "toggle" or "ab")
+                {
+                    applied = browser.PreferSlotB ? "B" : "A";
+                    Activity.PumpMainThread();
+                }
+
+                if (!ok)
+                {
+                    return
+                        $"[Error] vst3-preset-ab action={act} failed (empty slot or SetState error). " +
+                        browser.FormatAbDiagnostics();
+                }
+
+                var warn = browser.SlotsEqual
+                    ? " [Warning] slotsEqual=true — A and B are identical; wait after param-set " +
+                      "(or rely on flushProcessBeforeCapture) before capture-b, then re-check sha8."
+                    : string.Empty;
+
+                return
+                    $"[Success] vst3-preset-ab action={act} pluginId={pluginId} gameObject={name} " +
+                    $"flushedProcess={flushed} applied={applied ?? "none"} " +
+                    $"{browser.FormatAbDiagnostics()}{warn}";
             });
+        }
+
+        /// <summary>One silent Process block so GetState reflects recent SetParameterNormalized.</summary>
+        static bool TryFlushProcessForState(int pluginId)
+        {
+            var frames = Host.BlockSize;
+            if (frames < 1)
+                frames = 256;
+            var outL = new float[frames];
+            var outR = new float[frames];
+            return Host.Process(pluginId, null, null, outL, outR, frames);
         }
 
         [AiTool("vst3-parameter-panel-setup", Title = "VST3 / Parameter Panel Setup")]

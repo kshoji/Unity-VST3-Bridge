@@ -246,7 +246,33 @@ namespace jp.kshoji.unity.vst3nativehost
         private void ApplyNormalized(VstMidiParameterMapping.Binding binding, float t01)
         {
             var value = binding.MapNormalized(t01);
+            // Classic MidiManager path dual-dispatches MIDI1+MIDI2; suppress near-duplicate sets.
+            if (IsDuplicateParam(binding.parameterId, value))
+                return;
             VstHostManager.Instance.SetParameterNormalized(targetPluginId, binding.parameterId, value);
+        }
+
+        private uint lastParamId;
+        private float lastParamValue = float.NaN;
+        private double lastParamTime = -1;
+
+        private bool IsDuplicateParam(uint parameterId, float value)
+        {
+            var now = (double)System.Diagnostics.Stopwatch.GetTimestamp()
+                      / System.Diagnostics.Stopwatch.Frequency;
+            if (parameterId == lastParamId
+                && !float.IsNaN(lastParamValue)
+                && Mathf.Abs(lastParamValue - value) < 1e-5f
+                && lastParamTime >= 0
+                && now - lastParamTime < 0.002)
+            {
+                return true;
+            }
+
+            lastParamId = parameterId;
+            lastParamValue = value;
+            lastParamTime = now;
+            return false;
         }
 
         private static bool ChannelMatches(int bindingChannel, int channel) =>

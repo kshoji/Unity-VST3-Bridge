@@ -47,6 +47,42 @@ namespace jp.kshoji.unity.vst3nativehost
             set => showGui = value;
         }
 
+        public int SlotABytes => slotA?.Length ?? 0;
+        public int SlotBBytes => slotB?.Length ?? 0;
+        public bool PreferSlotB => preferSlotB;
+
+        /// <summary>True when both slots are non-empty and byte-identical.</summary>
+        public bool SlotsEqual
+        {
+            get
+            {
+                if (slotA == null || slotB == null || slotA.Length == 0 || slotB.Length == 0)
+                    return false;
+                if (slotA.Length != slotB.Length)
+                    return false;
+                for (var i = 0; i < slotA.Length; i++)
+                {
+                    if (slotA[i] != slotB[i])
+                        return false;
+                }
+
+                return true;
+            }
+        }
+
+        public string SlotASha8 => Sha8(slotA);
+        public string SlotBSha8 => Sha8(slotB);
+
+        /// <summary>Compact A/B slot diagnostics for tools / MCP.</summary>
+        public string FormatAbDiagnostics()
+        {
+            return
+                $"slotABytes={SlotABytes} slotASha8={SlotASha8} " +
+                $"slotBBytes={SlotBBytes} slotBSha8={SlotBSha8} " +
+                $"slotsEqual={SlotsEqual.ToString().ToLowerInvariant()} " +
+                $"preferSlotB={preferSlotB.ToString().ToLowerInvariant()}";
+        }
+
         private void Awake()
         {
             guiWindowId = nextGuiWindowId++;
@@ -138,6 +174,19 @@ namespace jp.kshoji.unity.vst3nativehost
             if (pluginId < 1 || !VstHostManager.Instance.IsInitialized)
                 return null;
             return VstHostManager.Instance.GetState(pluginId);
+        }
+
+        static string Sha8(byte[] data)
+        {
+            if (data == null || data.Length == 0)
+                return "-";
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+            {
+                var hash = sha.ComputeHash(data);
+                return
+                    hash[0].ToString("x2") + hash[1].ToString("x2") +
+                    hash[2].ToString("x2") + hash[3].ToString("x2");
+            }
         }
 
         private void OnGUI()
