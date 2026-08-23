@@ -46,6 +46,30 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                             "Phase 3 tools; needs FEATURE_MIDI_PLUGIN + UNITY_MCP_READY (vst3-sync-midi-define)"),
                         "midi-integration.md"),
                     DescribeFeature(
+                        "mcp-timeline",
+                        HasLoadedAssembly("jp.kshoji.unity.vst3nativehost.Mcp.Timeline"),
+                        AsmOrDefine(
+                            "jp.kshoji.unity.vst3nativehost.Mcp.Timeline",
+                            "FEATURE_USE_TIMELINE",
+                            "Phase 4B Timeline MCP tools"),
+                        "timeline.md"),
+                    DescribeFeature(
+                        "mcp-inputsystem",
+                        HasLoadedAssembly("jp.kshoji.unity.vst3nativehost.Mcp.InputSystem"),
+                        AsmOrDefine(
+                            "jp.kshoji.unity.vst3nativehost.Mcp.InputSystem",
+                            "FEATURE_INPUT_SYSTEM",
+                            "Phase 4B Input System MCP tools"),
+                        "animator-input.md"),
+                    DescribeFeature(
+                        "mcp-scriptable-audio",
+                        HasLoadedAssembly("jp.kshoji.unity.vst3nativehost.Mcp.ScriptableAudio"),
+                        AsmOrDefine(
+                            "jp.kshoji.unity.vst3nativehost.Mcp.ScriptableAudio",
+                            "UNITY_6000_3_OR_NEWER",
+                            "Phase 4B SA Generator MCP"),
+                        "scriptable-audio.md"),
+                    DescribeFeature(
                         "FEATURE_MIDI_PLUGIN",
                         HasLoadedAssembly("jp.kshoji.unity.vst3nativehost.Midi")
                         || HasScriptingDefine("FEATURE_MIDI_PLUGIN"),

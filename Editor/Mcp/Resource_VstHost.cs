@@ -151,6 +151,81 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
             });
         }
 
+        [AiResource(
+            Name = "VST3 audio graph by GameObject",
+            Route = "vst3://graph/{object}",
+            MimeType = Consts.MimeType.TextJson,
+            ListResources = nameof(ListGraphResources),
+            Description = "VstAudioGraph status for a scene GameObject (same as vst3-graph-status).")]
+        public ResponseResourceContent[] GraphByObject(string uri, string objectName)
+        {
+            return MainThread.Instance.Run(() =>
+            {
+                var name = string.IsNullOrWhiteSpace(objectName)
+                    ? Tool_VstHost.DefaultGraphObjectName
+                    : objectName.Trim();
+                var go = UnityEngine.GameObject.Find(name);
+                if (go == null)
+                {
+                    return AsArray(ResponseResourceContent.CreateText(
+                        uri,
+                        Consts.MimeType.TextJson,
+                        $"{{\"error\":\"GameObject not found\",\"name\":{EscapeJson(name)}}}"));
+                }
+
+                var graph = go.GetComponent<jp.kshoji.unity.vst3nativehost.VstAudioGraph>();
+                if (graph == null)
+                {
+                    return AsArray(ResponseResourceContent.CreateText(
+                        uri,
+                        Consts.MimeType.TextJson,
+                        $"{{\"error\":\"VstAudioGraph missing\",\"name\":{EscapeJson(name)}}}"));
+                }
+
+                var text = Tool_VstHost.FormatGraphStatus(graph);
+                return AsArray(ResponseResourceContent.CreateText(uri, Consts.MimeType.TextJson, text));
+            });
+        }
+
+        public ResponseListResource[] ListGraphResources()
+        {
+            return MainThread.Instance.Run(() =>
+            {
+                var graphs =
+#if UNITY_2023_1_OR_NEWER
+                    UnityEngine.Object.FindObjectsByType<jp.kshoji.unity.vst3nativehost.VstAudioGraph>(
+                        UnityEngine.FindObjectsSortMode.None);
+#else
+                    UnityEngine.Object.FindObjectsOfType<jp.kshoji.unity.vst3nativehost.VstAudioGraph>();
+#endif
+                if (graphs == null || graphs.Length == 0)
+                {
+                    return new[]
+                    {
+                        new ResponseListResource(
+                            $"vst3://graph/{Tool_VstHost.DefaultGraphObjectName}",
+                            "VST3 audio graph (none in scene)",
+                            false,
+                            Consts.MimeType.TextJson),
+                    };
+                }
+
+                var list = new System.Collections.Generic.List<ResponseListResource>();
+                foreach (var g in graphs)
+                {
+                    if (g == null) continue;
+                    var n = g.gameObject.name;
+                    list.Add(new ResponseListResource(
+                        $"vst3://graph/{n}",
+                        $"VST3 audio graph {n} armed={g.HasArmedGraph}",
+                        true,
+                        Consts.MimeType.TextJson));
+                }
+
+                return list.ToArray();
+            });
+        }
+
         public ResponseListResource[] ListAll() =>
             new[]
             {

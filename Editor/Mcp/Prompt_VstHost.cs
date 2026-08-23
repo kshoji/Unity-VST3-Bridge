@@ -99,5 +99,36 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                 "4. Move the CC; vst3-activity-read / vst3-param-get to confirm SetParameter.\n" +
                 "5. Optional: vst3-cc-mapping-list / edit for PitchBend or 14-bit.";
         }
+
+        [AiPrompt(Name = "vst3-graph-parallel-smoke", Role = Role.User)]
+        [Description(
+            "Phase 4A: parallel instruments → serial FX → status / bypass / edge gain.")]
+        public string GraphParallelSmoke()
+        {
+            return
+                "VST3 Audio Graph smoke (Play Mode):\n" +
+                "1. vst3-host-init → scan/load at least one Instrument (and optional Effect).\n" +
+                "2. vst3-graph-build-parallel instrumentIds=<id> effectIds=<fxId or empty>.\n" +
+                "3. vst3-graph-status (or resource vst3://graph/__VstHostMcpGraph) — confirm armed, nodes, edges.\n" +
+                "4. vst3-note-on / vst3-dsp-midi-schedule noteon; vst3-activity-read.\n" +
+                "5. Optional: vst3-graph-bypass nodeId=<inst node>; vst3-graph-set-edge-gain for send graphs.\n" +
+                "6. Optional sidechain: vst3-graph-build-sidechain mode=single with AGain SideChain effect.\n" +
+                "Prefer Build* over vst3-graph-set. Disable VstHostAudioFilter on the same GameObject (tools do this).";
+        }
+
+        [AiPrompt(Name = "vst3-sa-dsp-midi-smoke", Role = Role.User)]
+        [Description(
+            "Phase 4B (when Unity 6000.3+): SA Generator + DSP MIDI schedule.")]
+        public string SaDspMidiSmoke()
+        {
+            return
+                "Scriptable Audio + DSP MIDI (Unity 6000.3+, non-WebGL):\n" +
+                "1. vst3-features-status — confirm scriptable-audio available.\n" +
+                "2. Play Mode → host-init → load Instrument.\n" +
+                "3. vst3-sa-generator-setup pluginId=<id> (or skip if SA unavailable: use AudioFilter + schedule).\n" +
+                "4. vst3-dsp-midi-schedule messageType=noteon note=60 offsetMs=0 scheduleNoteOff=true.\n" +
+                "5. vst3-activity-read / listen for audio.\n" +
+                "Optional: vst3-sa-midi-bridge when FEATURE_SCRIPTABLE_AUDIO+MIDI present.";
+        }
     }
 }
