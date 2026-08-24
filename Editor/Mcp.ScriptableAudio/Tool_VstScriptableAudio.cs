@@ -63,3 +63,4 @@ namespace jp.kshoji.unity.vst3nativehost.mcp.scriptableaudio
         }
     }
 }
+#endif
