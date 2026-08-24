@@ -33,8 +33,7 @@ Runtime assemblies never reference Unity-MCP. Missing optional packages simply o
 ## Quick start
 
 1. Install Unity-MCP and open the project in Cursor (or another MCP client).
-2. Call `vst3-ping` then `vst3-features-status`.
-3. Prefer built-in prompts: `vst3-quick-start-note` (MIDI-less), `vst3-validate-troubleshoot`, `vst3-params-preset-smoke`, `vst3-midi-adapter-smoke`, `vst3-graph-parallel-smoke`.
+2. Call `vst3-features-status` then `vst3-host-status`.
 
 Use only tool names from `tools/list`. Always finish hanging notes with `vst3-note-off-all`.
 
@@ -42,7 +41,7 @@ Use only tool names from `tools/list`. Always finish hanging notes with `vst3-no
 
 | Kind | Examples | Behavior |
 |------|----------|----------|
-| Edit Mode OK | `vst3-ping`, `features-status`, `host-status`, scan/settings/list (when Description says so) | Normal success |
+| Edit Mode OK | `features-status`, `host-status`, scan/settings/list (when Description says so) | Normal success |
 | Play Mode required | note / MIDI1 send / AudioFilter setup / Process-backed paths | `[Error] {toolId} requires Play Mode...` |
 | Host uninitialized | load / note / params | `[Error] {toolId} requires an initialized VST host...` |
 
@@ -50,7 +49,7 @@ Use only tool names from `tools/list`. Always finish hanging notes with `vst3-no
 
 ### Core host
 
-`ping` · `features-status` · `host-status` · `host-init` / `host-terminate` · `scan` / `scan-folder` / `default-scan-folders` · `settings-get` / `settings-set` · `load` / `unload` / `list-instances` · `setup-audio-filter` / `audio-filter-detach` · `note-on` / `note-off` / `note-off-all` · `send-cc` / `send-pc` / `send-pitch` / `send-aftertouch` / `send-midi1` · `validate` / `verify-platforms` · `activity-read` / `activity-clear` / `activity-enable` · `diagnostics-read` · `sync-midi-define` · `event-sink-setup` · `animator-setup` · `dsp-midi-schedule` · `vs-register`
+`features-status` · `host-status` · `host-init` / `host-terminate` · `scan` / `scan-folder` / `default-scan-folders` · `settings-get` / `settings-set` · `load` / `unload` / `list-instances` · `setup-audio-filter` / `audio-filter-detach` · `note-on` / `note-off` / `note-off-all` · `send-cc` / `send-pc` / `send-pitch` / `send-aftertouch` / `send-midi1` · `verify-platforms` · `activity-read` / `activity-clear` / `activity-enable` · `diagnostics-read` · `sync-midi-define` · `event-sink-setup` · `animator-setup` · `dsp-midi-schedule` · `vs-register`
 
 ### Parameters / presets
 
@@ -79,10 +78,9 @@ Prefer **Build\*** helpers over raw `graph-set`.
 | `chuck-effect` / `chuck-event-midi-link` | Chunity |
 | `network-midi-link` | Network MIDI |
 
-## Resources / prompts
+## Resources
 
 | Resources | `vst3://features`, `scanned`, `instances`, `activity/recent`, `diagnostics`, `settings`, `params/{pluginId}`, `graph/{object}` |
-| Prompts | `vst3-quick-start-note`, `vst3-validate-troubleshoot`, `vst3-params-preset-smoke`, `vst3-midi-adapter-smoke`, `vst3-midi-learn-smoke`, `vst3-graph-parallel-smoke`, `vst3-sa-dsp-midi-smoke` |
 
 ## Boundary with Unity MIDI Plugin MCP
 

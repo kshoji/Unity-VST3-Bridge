@@ -205,11 +205,7 @@ after confirming `VstHostNative.so` PluginImporter flags.
 
 When linking the repo via `file:` / Git, `native~/**/build*` outputs may appear — use **Window → VST3 Host → Sanitize Extra Native Plugins**.
 
-## Optional Unity-MCP
-
-With Unity-MCP installed, smoke prompts (`vst3-quick-start-note`, `vst3-midi-adapter-smoke`,
-`vst3-graph-parallel-smoke`, etc.) exercise the same host paths as the manual matrix above.
-Platform / MIDI ON-OFF / IL2CPP expectations are unchanged; see [mcp.md](mcp.md).
+Unity-MCP (`vst3-*` tools) can drive the same host workflows as the manual matrix above when installed separately; see [mcp.md](mcp.md).
 Unity-MCP itself is not part of this package.
 
 ## MIDI-only build must not contain VST

@@ -27,7 +27,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
             string? displayName = null,
             [Description("If >0, CaptureFrom this plugin id after create/overwrite.")]
             int capturePluginId = 0,
-            [Description("When true, reuse/overwrite an existing asset at the path (smoke-test friendly).")]
+            [Description("When true, reuse/overwrite an existing asset at the path.")]
             bool overwrite = false
         )
         {

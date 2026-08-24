@@ -139,39 +139,6 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
             return sb.ToString();
         }
 
-        internal static bool TryGetPackageVersion(out string version, out string source)
-        {
-            version = "unknown";
-            source = "fallback";
-
-            try
-            {
-                var info = UnityEditor.PackageManager.PackageInfo.FindForAssembly(
-                    typeof(VstHost).Assembly);
-                if (info != null && !string.IsNullOrEmpty(info.version))
-                {
-                    version = info.version;
-                    source = info.source.ToString();
-                    return true;
-                }
-            }
-            catch (Exception)
-            {
-                // PackageInfo may throw when assembly is not under Packages/.
-            }
-
-            var asm = typeof(VstHost).Assembly;
-            var ver = asm.GetName().Version;
-            if (ver != null)
-            {
-                version = ver.ToString();
-                source = "assembly";
-                return true;
-            }
-
-            return false;
-        }
-
         internal static bool HasLoadedAssembly(string assemblyName)
         {
             if (string.IsNullOrEmpty(assemblyName))

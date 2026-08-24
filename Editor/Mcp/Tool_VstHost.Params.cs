@@ -22,7 +22,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
             int pluginId,
             [Description("Include hidden parameters.")]
             bool includeHidden = false,
-            [Description("Prefer CanAutomate, non-programChange, non-readOnly params first (smoke-test friendly).")]
+            [Description("Prefer CanAutomate, non-programChange, non-readOnly params first.")]
             bool preferAutomate = false,
             [Description("Max parameters to print.")]
             int maxResults = 200

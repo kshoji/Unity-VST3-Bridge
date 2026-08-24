@@ -9,7 +9,7 @@
         "VST3",
         "Audio"
     ],
-    "version": "1.4.0",
+    "version": "1.4.1",
     "unity": "2022.3",
     "description": "A Unity package for hosting VST3 instruments and effects through a native bridge, with optional MIDI plugin integration.",
     "dependencies": {},
