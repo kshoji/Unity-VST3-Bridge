@@ -1,4 +1,5 @@
 #nullable enable
+#if FEATURE_SCRIPTABLE_AUDIO && UNITY_6000_3_OR_NEWER && !UNITY_WEBGL
 using System.ComponentModel;
 using com.IvanMurzak.McpPlugin;
 using com.IvanMurzak.ReflectorNet.Utils;

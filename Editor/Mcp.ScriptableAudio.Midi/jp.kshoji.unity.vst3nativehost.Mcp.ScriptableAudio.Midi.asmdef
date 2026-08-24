@@ -19,6 +19,7 @@
         "FEATURE_MIDI_PLUGIN",
         "FEATURE_SCRIPTABLE_AUDIO",
         "UNITY_6000_3_OR_NEWER",
+        "!UNITY_WEBGL",
         "FEATURE_UNITY_MCP",
         "UNITY_MCP_READY"
     ],

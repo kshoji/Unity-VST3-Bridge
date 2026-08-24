@@ -17,6 +17,7 @@
     "autoReferenced": true,
     "defineConstraints": [
         "UNITY_6000_3_OR_NEWER",
+        "!UNITY_WEBGL",
         "FEATURE_UNITY_MCP",
         "UNITY_MCP_READY"
     ],
