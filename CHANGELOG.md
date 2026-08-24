@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.4.1
+
+### Removed
+- Development / smoke-test Unity-MCP prompts (`Prompt_VstHost.cs`):
+  `vst3-quick-start-note`, `vst3-validate-troubleshoot`, `vst3-params-preset-smoke`,
+  `vst3-midi-adapter-smoke`, `vst3-midi-learn-smoke`, `vst3-graph-parallel-smoke`,
+  `vst3-sa-dsp-midi-smoke`.
+- Development Unity-MCP tools: `vst3-ping`, `vst3-validate`.
+
+### Changed
+- `vst3-verify-platforms` remains available (moved next to host status tooling).
+- Docs: [Documentation~/mcp.md](Documentation~/mcp.md) and
+  [verification.md](Documentation~/verification.md) no longer document smoke prompts
+  or the removed tools.
+
 ## 1.4.0
 
 ### Added

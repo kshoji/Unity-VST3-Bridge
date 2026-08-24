@@ -139,7 +139,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                         true,
                         "VstAudioGraph in Runtime (no extra define)",
                         "audio-graph.md"),
-                    "playModeBoundaries: EditMode=ok for ping/features/status/scan(when documented); " +
+                    "playModeBoundaries: EditMode=ok for features/status/scan(when documented); " +
                     "PlayMode=required for note/Process/Activity audio path (see tool Descriptions).",
                     $"playMode={IsPlayMode}",
                 };
