@@ -14,7 +14,8 @@ namespace jp.kshoji.unity.vst3nativehost.mcp.midi
     {
         [AiTool("vst3-cc-mapping-create", Title = "VST3 / CC Mapping Create")]
         [Description(
-            "Create a VstMidiParameterMapping asset under Assets/... .asset. " +
+            "Editor only — creates a VstMidiParameterMapping asset under Assets/... .asset. " +
+            "Standalone builds use scene/Resources mappings wired in Editor. " +
             "Optionally assign it to VstHostMidiParameterMapper on a GameObject.")]
         public string CcMappingCreate
         (
@@ -71,7 +72,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp.midi
             Title = "VST3 / CC Mapping List",
             ReadOnlyHint = true,
             IdempotentHint = true)]
-        [Description("List VstMidiParameterMapping assets in the project (optional path filter).")]
+        [Description("Editor only — list VstMidiParameterMapping assets in the project (optional path filter).")]
         public string CcMappingList
         (
             [Description("Optional Assets/ folder or path substring filter.")]
@@ -111,7 +112,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp.midi
 
         [AiTool("vst3-cc-mapping-edit", Title = "VST3 / CC Mapping Edit")]
         [Description(
-            "Upsert a binding on a VstMidiParameterMapping asset. " +
+            "Editor only — upsert a binding on a VstMidiParameterMapping asset. " +
             "source: ControlChange | FourteenBitControlChange | PitchBend.")]
         public string CcMappingEdit
         (
@@ -188,7 +189,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp.midi
 
         [AiTool("vst3-midi-learn", Title = "VST3 / MIDI Learn")]
         [Description(
-            "Arm MIDI Learn on VstHostMidiParameterMapper for a parameter. " +
+            "Editor only — arm MIDI Learn on VstHostMidiParameterMapper for a parameter. " +
             "Next CC or Pitch Bend writes the Mapping asset. " +
             "Set bindNow=true to upsert immediately (controller / sourceHint) without waiting.")]
         public string MidiLearn

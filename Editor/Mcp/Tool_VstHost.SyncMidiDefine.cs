@@ -10,11 +10,10 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
     {
         [AiTool("vst3-sync-midi-define", Title = "VST3 / Sync MIDI Plugin Define")]
         [Description(
-            "Sync FEATURE_MIDI_PLUGIN scripting define across build targets " +
+            "Editor only — sync FEATURE_MIDI_PLUGIN scripting define across build targets " +
             "(same as Window/VST3 Host/Sync MIDI Plugin Define). " +
-            "Enables jp.kshoji.unity.vst3nativehost.Midi and MIDI MCP tools " +
-            "(jp.kshoji.unity.vst3nativehost.Mcp.Midi) when jp.kshoji.midi.asmdef is present. " +
-            "Edit Mode only; may require a domain reload. Call before MIDI wiring tools if missing.")]
+            "Enables jp.kshoji.unity.vst3nativehost.Midi and MCP wiring tools " +
+            "(Mcp.Midi.Runtime + Editor cc-mapping tools) when jp.kshoji.midi.asmdef is present.")]
         public string SyncMidiDefine()
         {
             return MainThread.Instance.Run(() =>
@@ -31,14 +30,16 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
                 var definePresent = HasScriptingDefine(VstHostMidiDefineSync.DefineSymbol);
                 var midiAsm = HasLoadedAssembly("jp.kshoji.unity.vst3nativehost.Midi");
                 var mcpMidiAsm = HasLoadedAssembly("jp.kshoji.unity.vst3nativehost.Mcp.Midi");
+                var mcpMidiRuntimeAsm = HasLoadedAssembly("jp.kshoji.unity.vst3nativehost.Mcp.Midi.Runtime");
 
                 return
                     $"[Success] vst3-sync-midi-define hasMidiAsmdef={hasMidi} " +
-                    $"definePresent={definePresent} midiAsmLoaded={midiAsm} mcpMidiAsmLoaded={mcpMidiAsm}. " +
-                    (hasMidi && !mcpMidiAsm
+                    $"definePresent={definePresent} midiAsmLoaded={midiAsm} " +
+                    $"mcpMidiEditorAsm={mcpMidiAsm} mcpMidiRuntimeAsm={mcpMidiRuntimeAsm}. " +
+                    (hasMidi && !mcpMidiRuntimeAsm
                         ? "If MIDI MCP tools are missing, wait for domain reload / recompile then retry vst3-features-status."
                         : hasMidi
-                            ? "MIDI MCP tools (Mcp.Midi) should be available."
+                            ? "MIDI MCP wiring tools (Mcp.Midi.Runtime) should be available in Play Mode / builds."
                             : "jp.kshoji.midi.asmdef not found — install Unity MIDI Plugin under Assets.");
             });
         }

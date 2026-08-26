@@ -14,8 +14,8 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
             ReadOnlyHint = true,
             IdempotentHint = true)]
         [Description(
-            "Read Project Settings → VST3 Host (auto-init on Play, preferred name filter, extra scan folders). " +
-            "Edit Mode OK.")]
+            "Editor only — read Project Settings → VST3 Host. " +
+            "Standalone builds use VstHostRuntimeMcpConfig (vst3://settings). Edit Mode OK.")]
         public string SettingsGet()
         {
             return MainThread.Instance.Run(() =>
@@ -24,8 +24,8 @@ namespace jp.kshoji.unity.vst3nativehost.mcp
 
         [AiTool("vst3-settings-set", Title = "VST3 / Settings Set")]
         [Description(
-            "Update Project Settings → VST3 Host. Omitted/null fields keep current values. " +
-            "extraScanFolders replaces the whole list when provided (use empty array to clear).")]
+            "Editor only — update Project Settings → VST3 Host. " +
+            "Standalone: edit Resources/VstHostRuntimeMcpConfig.asset instead.")]
         public string SettingsSet
         (
             [Description("Auto Initialize On Play. Null = leave unchanged.")]

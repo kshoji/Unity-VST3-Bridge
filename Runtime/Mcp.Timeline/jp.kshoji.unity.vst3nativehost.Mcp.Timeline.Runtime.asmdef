@@ -1,0 +1,42 @@
+{
+    "name": "jp.kshoji.unity.vst3nativehost.Mcp.Timeline.Runtime",
+    "rootNamespace": "jp.kshoji.unity.vst3nativehost.mcp.timeline",
+    "references": [
+        "jp.kshoji.unity.vst3nativehost.Runtime",
+        "jp.kshoji.unity.vst3nativehost.Mcp.Core",
+        "jp.kshoji.unity.vst3nativehost.Timeline",
+        "Unity.Timeline"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [
+        "WebGL",
+        "Android",
+        "iOS"
+    ],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "McpPlugin.dll",
+        "McpPlugin.Common.dll",
+        "ReflectorNet.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "FEATURE_USE_TIMELINE",
+        "FEATURE_UNITY_MCP",
+        "UNITY_MCP_READY"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.ivanmurzak.unity.mcp",
+            "expression": "0.76.0",
+            "define": "FEATURE_UNITY_MCP"
+        },
+        {
+            "name": "com.unity.timeline",
+            "expression": "1.6.0",
+            "define": "FEATURE_USE_TIMELINE"
+        }
+    ],
+    "noEngineReferences": false
+}

@@ -33,6 +33,15 @@ namespace jp.kshoji.unity.vst3nativehost.scriptableaudio
             set => targetPluginId = value;
         }
 
+        /// <summary>MCP / runtime wiring for SA timed MIDI → VST DSP queue.</summary>
+        public void Configure(VstParameterTarget? target = null, VstAudioGraph? graph = null)
+        {
+            if (target != null)
+                parameterTarget = target;
+            if (graph != null)
+                audioGraph = graph;
+        }
+
         int ResolvePluginId(byte channel)
         {
             if (audioGraph != null)

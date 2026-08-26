@@ -32,6 +32,20 @@ namespace jp.kshoji.unity.vst3nativehost
                 Apply();
         }
 
+        /// <summary>MCP / runtime wiring for filter → adapter link.</summary>
+        public void Configure(
+            MidiChannelFilter? filter = null,
+            VstHostMidiAdapter? adapterRef = null,
+            bool? unregisterAdapter = null)
+        {
+            if (filter != null)
+                channelFilter = filter;
+            if (adapterRef != null)
+                adapter = adapterRef;
+            if (unregisterAdapter.HasValue)
+                unregisterAdapterFromMidiManager = unregisterAdapter.Value;
+        }
+
         /// <summary>
         /// Adds the Adapter GameObject to the filter's <c>forwardTargets</c> and optionally
         /// unregisters the Adapter from MidiManager so messages flow Filter → Adapter only.

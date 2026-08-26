@@ -79,6 +79,13 @@ namespace jp.kshoji.unity.vst3nativehost
             VstHostManager.Instance.ControlChange(id, channel, controller, value);
         }
 
+        /// <summary>MCP / runtime wiring for channel and default note velocity.</summary>
+        public void ConfigureMidi(int midiChannel, int velocity)
+        {
+            channel = Mathf.Clamp(midiChannel, 0, 15);
+            defaultVelocity = Mathf.Clamp(velocity, 1, 127);
+        }
+
         public void PitchBend(int value14)
         {
             var id = PluginId;

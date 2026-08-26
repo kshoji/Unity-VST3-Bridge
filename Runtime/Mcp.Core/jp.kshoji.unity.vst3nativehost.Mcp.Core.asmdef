@@ -1,0 +1,16 @@
+{
+    "name": "jp.kshoji.unity.vst3nativehost.Mcp.Core",
+    "rootNamespace": "jp.kshoji.unity.vst3nativehost.mcp.core",
+    "references": [
+        "jp.kshoji.unity.vst3nativehost.Runtime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

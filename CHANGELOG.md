@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.4.2
+
+### Added
+- **Runtime MCP (Standalone):** `Runtime/Mcp*.Runtime` assemblies register `vst3-*`
+  host control, graph, presets (Resources), MIDI send, and optional wiring tools in
+  Desktop builds and Editor Play Mode (Unity-MCP ≥ 0.76; not bundled).
+  - `VstHostRuntimeMcpConfig` (Resources) + `VstHostMcpRuntimeBootstrap` (opt-in;
+    non-empty **token** required when enabled).
+  - Window → VST3 Host → **Export Runtime MCP Config to Resources** (and Project Settings).
+  - Shared helpers: `Runtime/Mcp.Core/` (`McpExecutionContext`, tool helpers).
+  - New: `vst3-timeline-director-control` (scene `PlayableDirector` play/pause/stop/time).
+  - `vst3-scan` merges `extraScanFolders` from the runtime config after OS-standard folders.
+  - Package tests under `Tests/Runtime/Mcp/` (when Unity-MCP resolves).
+  - Docs: Runtime MCP sections in [Documentation~/mcp.md](Documentation~/mcp.md),
+    [verification.md](Documentation~/verification.md), [limitations.md](Documentation~/limitations.md).
+  - `link.xml` preserves for MCP / ReflectorNet under IL2CPP.
+
+### Changed
+- Most former Editor MCP tools moved to Runtime asmdefs so Editor Play Mode and
+  Standalone share one tool ID set (no duplicate `tools/list` entries).
+- Resource `vst3://settings` reads `VstHostRuntimeMcpConfig` in builds.
+
+### Editor-only (unchanged capability, Editor asmdefs)
+- `vst3-settings-get/set`, `vst3-sync-midi-define`, `vst3-verify-platforms`,
+  `vst3-preset-create-asset`, `vst3-parameter-panel-setup`, `vst3-animator-setup`,
+  `vst3-vs-register`, Timeline asset tools, CC mapping CRUD / midi-learn.
+
 ## 1.4.1
 
 ### Removed

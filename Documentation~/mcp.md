@@ -19,23 +19,106 @@ Custom tool conventions follow the Unity-MCP wiki:
 
 | Path | asmdef | When it compiles |
 |------|--------|------------------|
-| `Editor/Mcp/` | `jp.kshoji.unity.vst3nativehost.Mcp` | Unity-MCP ready |
-| `Editor/Mcp.Midi/` | `…Mcp.Midi` | Unity-MCP + `FEATURE_MIDI_PLUGIN` |
-| `Editor/Mcp.Timeline/` | `…Mcp.Timeline` | Unity-MCP + `FEATURE_USE_TIMELINE` |
-| `Editor/Mcp.InputSystem/` | `…Mcp.InputSystem` | Unity-MCP + Input System |
-| `Editor/Mcp.ScriptableAudio/` | `…Mcp.ScriptableAudio` | Unity-MCP + Unity 6000.3+ |
-| `Editor/Mcp.ScriptableAudio.Midi/` | `…Mcp.ScriptableAudio.Midi` | SA + MIDI |
-| `Editor/Mcp.Midi.Chunity/` | `…Mcp.Midi.Chunity` | MIDI + Chunity |
-| `Editor/Mcp.Midi.Network/` | `…Mcp.Midi.Network` | MIDI + Network MIDI |
+| `Runtime/Mcp.Core/` | `…Mcp.Core` | Always (shared MCP helpers) |
+| `Runtime/Mcp/` | `…Mcp.Runtime` | Unity-MCP ready; **Standalone + Editor Play Mode** |
+| `Runtime/Mcp.Midi/` | `…Mcp.Midi.Runtime` | Unity-MCP + `FEATURE_MIDI_PLUGIN` (wiring tools) |
+| `Runtime/Mcp.Timeline/` | `…Mcp.Timeline.Runtime` | Unity-MCP + Timeline (director control) |
+| `Runtime/Mcp.InputSystem/` | `…Mcp.InputSystem.Runtime` | Unity-MCP + Input System |
+| `Runtime/Mcp.ScriptableAudio/` | `…Mcp.ScriptableAudio.Runtime` | Unity 6000.3+ non-WebGL |
+| `Runtime/Mcp.ScriptableAudio.Midi/` | `…Mcp.ScriptableAudio.Midi.Runtime` | SA + MIDI defines |
+| `Runtime/Mcp.Midi.Chunity/` | `…Mcp.Midi.Chunity.Runtime` | MIDI + Chunity |
+| `Runtime/Mcp.Midi.Network/` | `…Mcp.Midi.Network.Runtime` | MIDI + Network MIDI |
+| `Editor/Mcp/` | `…Mcp` | **Editor-only** (settings, verify, preset asset, VS register, …) |
+| `Editor/Mcp.Midi/` | `…Mcp.Midi` | **Editor-only** CC mapping asset CRUD / learn |
+| `Editor/Mcp.Timeline/` | `…Mcp.Timeline` | **Editor-only** TimelineAsset creation |
 
-Runtime assemblies never reference Unity-MCP. Missing optional packages simply omit those tools from registration.
+Runtime assemblies never reference Unity-MCP Editor code. Host control, graph, presets (runtime), and optional wiring live in **`Runtime/Mcp*.Runtime`**; asset creation and Project Settings stay in **`Editor/Mcp.*`**. Standalone builds opt in via `VstHostRuntimeMcpConfig` (Resources) and `VstHostMcpRuntimeBootstrap`, which registers all loaded `*.Mcp.*.Runtime` assemblies. Missing optional packages omit those tools from `tools/list`.
 
-## Quick start
+### Editor-only vs Runtime (summary)
 
-1. Install Unity-MCP and open the project in Cursor (or another MCP client).
-2. Call `vst3-features-status` then `vst3-host-status`.
+| Editor only | Runtime + Editor Play Mode |
+|-------------|----------------------------|
+| `settings-get/set`, `verify-platforms`, `sync-midi-define` | `host-*`, scan/load, params, MIDI send, graph, activity |
+| `preset-create-asset`, `parameter-panel-setup`, `animator-setup`, `vs-register` | `preset-capture/apply/list/ab` (Resources path in builds) |
+| `timeline-param-track`, `timeline-program-marker` | `timeline-director-control` |
+| `cc-mapping-create/list/edit`, `midi-learn` | `midi-adapter-setup`, `smf-link`, `channel-routes`, `filter-link`, `route-sync` |
+| | `inputsystem-bridge`, `sa-generator-setup`, `sa-midi-bridge`, Chunity / Network links |
 
-Use only tool names from `tools/list`. Always finish hanging notes with `vst3-note-off-all`.
+| Export Runtime MCP Config to Resources | Copies Project Settings scan prefs → `Resources/VstHostRuntimeMcpConfig.asset` |
+
+## Runtime MCP (Standalone builds)
+
+Unity-MCP exposes **two connection targets** in a typical workflow:
+
+| Connection | When | Tools registered |
+|------------|------|------------------|
+| **Editor** | Unity Editor open | Runtime `vst3-*` (Play Mode) **plus** Editor-only tools |
+| **Runtime / build** | Standalone executable running | Runtime `vst3-*` only (no asset creation, settings, verify) |
+
+```mermaid
+flowchart LR
+  subgraph editor [Unity Editor]
+    MCP_E[MCP client → Editor session]
+    ED[Editor/Mcp.* tools]
+    RT_E[Runtime/Mcp.* tools in Play Mode]
+    MCP_E --> ED
+    MCP_E --> RT_E
+  end
+
+  subgraph build [Standalone build]
+    BOOT[VstHostMcpRuntimeBootstrap]
+    MCP_R[MCP client → running app]
+    RT[Runtime/Mcp.* tools]
+    BOOT --> MCP_R
+    MCP_R --> RT
+  end
+```
+
+When `VstHostRuntimeMcpConfig.mcpEnabled` is true, `VstHostMcpRuntimeBootstrap` starts **UnityMcpPluginRuntime** after scene load and registers every loaded `jp.kshoji.unity.vst3nativehost.Mcp.*.Runtime` assembly. Default is **off** — enable explicitly before shipping builds that expose MCP.
+
+### Runtime configuration
+
+| Field | Purpose |
+|-------|---------|
+| `mcpEnabled` | Master switch; when false, no MCP connection is started |
+| `host` | MCP server URL (e.g. `http://localhost:8080`) |
+| `token` | Bearer token — **required** when `mcpEnabled` is true (empty token blocks Bootstrap connect) |
+| `autoInitializeHostOnStart` | Calls host init from audio settings after connect |
+| `extraScanFolders` | Extra absolute `.vst3` paths; **`vst3-scan` merges these** after OS-standard folders |
+| `preferredPluginNameContains` | Hint for auto-load helpers |
+
+**Placement:** `Assets/Resources/VstHostRuntimeMcpConfig.asset` (Create → VST3 Host → Runtime MCP Config), or **Window → VST3 Host → Export Runtime MCP Config to Resources** / Project Settings → VST3 Host to copy scan folders from Project Settings.
+
+Project Settings (`vst3-settings-get/set`) apply to the **Editor only**. Standalone reads `VstHostRuntimeMcpConfig` and resource `vst3://settings`.
+
+### Workflow: author in Editor, control in build
+
+1. In Editor: wire scene components (AudioFilter, Graph, MIDI adapter, Timeline Director, Input actions, presets under Resources).
+2. Export runtime MCP config; set `mcpEnabled` and `token` for builds that need remote control.
+3. Build Desktop Standalone; start MCP server; connect client to the **running app** (not the Editor session).
+4. Call `vst3-features-status` → `vst3-host-init` (if not auto-init) → `vst3-scan` / `vst3-load` → `vst3-note-on` / `vst3-param-set` / graph tools.
+
+Editor-only steps (mapping asset CRUD, Timeline track creation, VS register, verify) stay in the Editor; the build uses **pre-placed** assets and scene references.
+
+### Security
+
+- Runtime MCP is **opt-in** (`mcpEnabled = false` by default).
+- Use a **non-empty token** when enabling; Bootstrap refuses to connect if the token is empty. Treat it like an API key.
+- Prefer **localhost** binding on the MCP server; exposing MCP on a LAN or WAN increases remote-control risk for host load, parameters, and MIDI injection.
+- Desktop Standalone only (same platform bounds as VST3 native). WebGL / mobile targets exclude Runtime MCP assemblies.
+
+### Quick start (Standalone)
+
+1. Install Unity-MCP in the project (≥ 0.76.0).
+2. Create or export `Resources/VstHostRuntimeMcpConfig.asset`; set `mcpEnabled`, `host`, `token`; optional `autoInitializeHostOnStart`.
+3. Add audio path (sample scene or `VstHostAudioFilter` + listener).
+4. Build **Windows / macOS / Linux Standalone**; launch with MCP server running.
+5. Connect MCP client to the **build** session.
+6. `vst3-features-status` → `vst3-host-status` → `vst3-host-init` (if needed) → `vst3-scan` → `vst3-load` → `vst3-note-on` → **`vst3-note-off-all`**.
+
+Manual matrix: [verification.md](verification.md#runtime-mcp-standalone).
+
+## Quick start (Editor)
 
 ## Edit Mode vs Play Mode
 
@@ -55,9 +138,11 @@ Use only tool names from `tools/list`. Always finish hanging notes with `vst3-no
 
 `params-list` · `param-get` / `param-set` · `programs-list` / `set-program` · `state-get` / `state-set` · `preset-create-asset` / `preset-capture` / `preset-apply` / `preset-list` / `preset-ab` · `parameter-panel-setup`
 
-### MIDI Plugin wiring (`Mcp.Midi`)
+### MIDI Plugin wiring
 
-`midi-adapter-setup` · `smf-link` · `cc-mapping-create` / `list` / `edit` · `midi-learn` · `channel-routes` · `filter-link` · `route-sync`
+**Runtime:** `midi-adapter-setup` · `smf-link` · `channel-routes` · `filter-link` · `route-sync`
+
+**Editor only:** `cc-mapping-create` / `list` / `edit` · `midi-learn`
 
 Device I/O, inject, and SMF transport stay on MIDI MCP (`midi-*` / `smf-*`). These tools only wire Adapter / SmfLink / mappings to the VST host.
 
@@ -71,8 +156,9 @@ Prefer **Build\*** helpers over raw `graph-set`.
 
 | Tools | Condition |
 |-------|-----------|
-| `timeline-param-track` / `program-marker` | Timeline |
-| `inputsystem-bridge` | Input System |
+| `timeline-director-control` | Timeline (Runtime — play/pause/stop/time on scene Director) |
+| `timeline-param-track` / `program-marker` | Timeline (**Editor only** — creates `.playable` assets) |
+| `inputsystem-bridge` | Input System (Resources / scene `InputActionAsset`) |
 | `sa-generator-setup` | Scriptable Audio (Unity 6000.3+) |
 | `sa-midi-bridge` | SA + MIDI |
 | `chuck-effect` / `chuck-event-midi-link` | Chunity |
@@ -80,7 +166,7 @@ Prefer **Build\*** helpers over raw `graph-set`.
 
 ## Resources
 
-| Resources | `vst3://features`, `scanned`, `instances`, `activity/recent`, `diagnostics`, `settings`, `params/{pluginId}`, `graph/{object}` |
+| Resources | `vst3://features`, `scanned`, `instances`, `activity/recent`, `diagnostics`, `settings`, `params/{pluginId}`, `graph/{object}` (**Mcp.Runtime**)
 
 ## Boundary with Unity MIDI Plugin MCP
 
@@ -102,6 +188,7 @@ Do not implement `vst3-*` inside the MIDI package.
 | Audio Graph | `vst3-graph-status` / `build-*` / bypass / gain |
 | Virtual Controller | `vst3-note-*` / `send-cc` / `note-off-all` |
 | Sync MIDI Plugin Define | `vst3-sync-midi-define` |
+| Export Runtime MCP Config to Resources | (menu only — creates/updates Resources asset) |
 | Verify Plugin Platforms | `vst3-verify-platforms` |
 | Visual Scripting / Register Nodes | `vst3-vs-register` |
 | Project Settings → VST3 Host | `vst3-settings-get` / `set` |
@@ -110,7 +197,9 @@ Do not implement `vst3-*` inside the MIDI package.
 
 Platform / MIDI ON-OFF / IL2CPP checks follow the existing matrix in
 [verification.md](verification.md). MCP does not replace Standalone Build Verify;
-use `vst3-verify-platforms` plus manual or CI verify menus as today.
+use `vst3-verify-platforms` (Editor only) plus manual or CI verify menus as today.
+
+Runtime MCP Standalone checks: [verification.md — Runtime MCP](verification.md#runtime-mcp-standalone).
 
 ## Out of scope
 

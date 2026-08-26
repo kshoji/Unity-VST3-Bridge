@@ -32,6 +32,18 @@ namespace jp.kshoji.unity.vst3nativehost
             set => effectPluginId = value;
         }
 
+        public TargetKind Target
+        {
+            get => target;
+            set => target = value;
+        }
+
+        public float OutputGain
+        {
+            get => outputGain;
+            set => outputGain = outputGain;
+        }
+
         private void Reset()
         {
             audioFilter = GetComponent<VstHostAudioFilter>();
