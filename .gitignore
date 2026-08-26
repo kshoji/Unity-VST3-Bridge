@@ -39,3 +39,6 @@ native.meta
 *.sln
 *.slnx
 *.unityproj
+docs/dev
+docs/dev.meta
+docs.meta

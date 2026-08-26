@@ -1,0 +1,72 @@
+---
+description: README.md must be English → Japanese → Chinese (Simplified)
+globs: "**/README.md"
+alwaysApply: false
+---
+
+# README i18n format
+
+When creating or editing project `README.md` files, use this structure.
+
+## Required layout
+
+1. Sections in order: `## English` → `## 日本語` → `## 中文(简体)`
+2. Separate languages with a `---` line
+3. Put the topic title under each language as `### …`
+4. Prefer `#### Related documentation` / `#### 関連ドキュメント` / `#### 相关文档` for doc links
+
+## Link rules
+
+- English docs: `documents/<name>.md`
+- Japanese: `documents/i18n/ja/<name>.md`
+- Chinese: `documents/i18n/zh-CN/<name>.md`
+- Links to other `README.md` files keep the same path in all languages
+- Keep code, paths, type names, and define symbols unchanged; translate prose only
+- Link only to **user-facing** docs under `Assets/MIDI/documents/`. Never link READMEs to `.cursor/plans/` or `docs/dev/` (see `dev-plans-vs-release-docs.mdc`)
+
+## Example skeleton
+
+```markdown
+## English
+
+### Topic Title
+
+Brief description.
+
+#### Related documentation
+
+- [Samples](../../documents/samples.md)
+
+---
+
+## 日本語
+
+### トピックタイトル
+
+簡単な説明。
+
+#### 関連ドキュメント
+
+- [サンプル](../../documents/i18n/ja/samples.md)
+
+---
+
+## 中文(简体)
+
+### 主题标题
+
+简要说明。
+
+#### 相关文档
+
+- [示例](../../documents/i18n/zh-CN/samples.md)
+```
+
+## Exceptions
+
+Do not rewrite upstream vendor package root READMEs under trees such as `UdpMidi2Discovery/*/` package roots or `RTP-MIDI-for-.NET/` package roots unless explicitly asked. Project-owned directory READMEs under `Assets/MIDI/` and the repo root must follow this format.
+
+## Not covered by this rule
+
+- `docs/dev/**` and `.cursor/plans/**` are internal. Do not apply `documents/i18n/` layout to them, and do not “fill gaps” by copying plans/spikes into `Assets/MIDI/documents/`.
+- Optional translations for internal archives (if any) belong under `docs/dev/i18n/` only.
