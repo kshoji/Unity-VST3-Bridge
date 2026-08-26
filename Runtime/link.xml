@@ -1,4 +1,17 @@
 <linker>
   <!-- Preserve P/Invoke surface for IL2CPP Standalone Windows. -->
   <assembly fullname="jp.kshoji.unity.vst3nativehost.Runtime" preserve="all" />
+  <assembly fullname="jp.kshoji.unity.vst3nativehost.Mcp.Core" preserve="all" />
+  <assembly fullname="jp.kshoji.unity.vst3nativehost.Mcp.Runtime" preserve="all" />
+  <assembly fullname="jp.kshoji.unity.vst3nativehost.Mcp.Midi.Runtime" preserve="all" />
+  <assembly fullname="jp.kshoji.unity.vst3nativehost.Mcp.Timeline.Runtime" preserve="all" />
+  <assembly fullname="jp.kshoji.unity.vst3nativehost.Mcp.InputSystem.Runtime" preserve="all" />
+  <assembly fullname="jp.kshoji.unity.vst3nativehost.Mcp.ScriptableAudio.Runtime" preserve="all" />
+  <assembly fullname="jp.kshoji.unity.vst3nativehost.Mcp.ScriptableAudio.Midi.Runtime" preserve="all" />
+  <assembly fullname="jp.kshoji.unity.vst3nativehost.Mcp.Midi.Chunity.Runtime" preserve="all" />
+  <assembly fullname="jp.kshoji.unity.vst3nativehost.Mcp.Midi.Network.Runtime" preserve="all" />
+  <!-- Unity-MCP precompiled refs (Phase 0 IL2CPP spike). -->
+  <assembly fullname="McpPlugin" preserve="all" />
+  <assembly fullname="McpPlugin.Common" preserve="all" />
+  <assembly fullname="ReflectorNet" preserve="all" />
 </linker>

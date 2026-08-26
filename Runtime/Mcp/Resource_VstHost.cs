@@ -1,0 +1,299 @@
+#nullable enable
+using System;
+using System.Text;
+using com.IvanMurzak.McpPlugin;
+using com.IvanMurzak.McpPlugin.Common.Model;
+using com.IvanMurzak.ReflectorNet.Utils;
+using jp.kshoji.unity.vst3nativehost.mcp.core;
+using Activity = jp.kshoji.unity.vst3nativehost.VstHostActivity;
+using Diagnostics = jp.kshoji.unity.vst3nativehost.VstHostAudioDiagnostics;
+
+namespace jp.kshoji.unity.vst3nativehost.mcp.runtime
+{
+    using Consts = com.IvanMurzak.McpPlugin.Common.Consts;
+
+    /// <summary>Read-only MCP resources for VST3 host state (Runtime + Editor Play Mode).</summary>
+    [AiResourceType]
+    public partial class Resource_VstHost
+    {
+        [AiResource(
+            Name = "VST3 features",
+            Route = "vst3://features",
+            MimeType = Consts.MimeType.TextJson,
+            ListResources = nameof(ListAll),
+            Description = "Optional integration availability (same as vst3-features-status).")]
+        public ResponseResourceContent[] Features(string uri) =>
+            TextFromTool(uri, () => new Tool_VstHost().FeaturesStatus());
+
+        [AiResource(
+            Name = "VST3 scanned plugins",
+            Route = "vst3://scanned",
+            MimeType = Consts.MimeType.TextJson,
+            ListResources = nameof(ListAll),
+            Description = "Last scan result from vst3-scan / vst3-scan-folder (empty until scanned).")]
+        public ResponseResourceContent[] Scanned(string uri) =>
+            MainThread.Instance.Run(() =>
+            {
+                var text = VstHostToolHelpers.LastScanned.Count == 0
+                    ? "{\"hint\":\"Call vst3-scan first\",\"count\":0}"
+                    : VstHostToolHelpers.FormatScanned(VstHostToolHelpers.LastScanned);
+                return AsArray(ResponseResourceContent.CreateText(uri, Consts.MimeType.TextJson, text));
+            });
+
+        [AiResource(
+            Name = "VST3 loaded instances",
+            Route = "vst3://instances",
+            MimeType = Consts.MimeType.TextJson,
+            ListResources = nameof(ListAll),
+            Description = "Currently loaded plugin instances.")]
+        public ResponseResourceContent[] Instances(string uri) =>
+            MainThread.Instance.Run(() =>
+            {
+                var host = jp.kshoji.unity.vst3nativehost.VstHostManager.Instance;
+                var text = !host.IsInitialized
+                    ? "{\"hint\":\"Host not initialized\",\"loadedCount\":0}"
+                    : $"[Success] vst3-list-instances\n{VstHostToolHelpers.FormatInstances()}";
+                return AsArray(ResponseResourceContent.CreateText(uri, Consts.MimeType.TextJson, text));
+            });
+
+        [AiResource(
+            Name = "VST3 recent activity",
+            Route = "vst3://activity/recent",
+            MimeType = Consts.MimeType.TextJson,
+            ListResources = nameof(ListAll),
+            Description = "Recent host activity ring buffer.")]
+        public ResponseResourceContent[] ActivityRecent(string uri) =>
+            MainThread.Instance.Run(() =>
+            {
+                Activity.PumpMainThread();
+                var entries = Activity.GetRecent(64);
+                var sb = new StringBuilder();
+                sb.Append($"{{\"enabled\":{Activity.Enabled.ToString().ToLowerInvariant()},\"count\":{entries.Length},\"lines\":[");
+                for (var i = 0; i < entries.Length; i++)
+                {
+                    if (i > 0) sb.Append(',');
+                    var e = entries[i];
+                    sb.Append(
+                        $"{{\"t\":{e.TimeSeconds:0.###},\"kind\":\"{e.Kind}\",\"pluginId\":{e.PluginId}," +
+                        $"\"detail\":{EscapeJson(e.Detail)}}}");
+                }
+
+                sb.Append("]}");
+                return AsArray(ResponseResourceContent.CreateText(uri, Consts.MimeType.TextJson, sb.ToString()));
+            });
+
+        [AiResource(
+            Name = "VST3 audio diagnostics",
+            Route = "vst3://diagnostics",
+            MimeType = Consts.MimeType.TextJson,
+            ListResources = nameof(ListAll),
+            Description = "Lifetime Process/blockSize/buffer diagnostics counters.")]
+        public ResponseResourceContent[] DiagnosticsResource(string uri) =>
+            MainThread.Instance.Run(() =>
+            {
+                Diagnostics.Snapshot(
+                    out var processFail,
+                    out var blockSkip,
+                    out var bufferClip,
+                    out var skipFrames,
+                    out var skipLimit,
+                    out var clipFrames,
+                    out var clipCap);
+                var text =
+                    $"{{\"processFail\":{processFail},\"blockSizeSkip\":{blockSkip}," +
+                    $"\"lastSkipFrames\":{skipFrames},\"lastSkipLimit\":{skipLimit}," +
+                    $"\"bufferCapacityClip\":{bufferClip},\"lastClipFrames\":{clipFrames}," +
+                    $"\"lastClipCapacity\":{clipCap}}}";
+                return AsArray(ResponseResourceContent.CreateText(uri, Consts.MimeType.TextJson, text));
+            });
+
+        [AiResource(
+            Name = "VST3 runtime settings",
+            Route = "vst3://settings",
+            MimeType = Consts.MimeType.TextJson,
+            ListResources = nameof(ListAll),
+            Description = "VstHostRuntimeMcpConfig (Resources) or hint when missing.")]
+        public ResponseResourceContent[] Settings(string uri) =>
+            MainThread.Instance.Run(() =>
+            {
+                var cfg = VstHostRuntimeMcpConfig.LoadFromResources();
+                var text = cfg == null
+                    ? "{\"hint\":\"Create Resources/VstHostRuntimeMcpConfig.asset or use vst3-settings-get in Editor\"}"
+                    : cfg.FormatForMcp();
+                return AsArray(ResponseResourceContent.CreateText(uri, Consts.MimeType.TextJson, text));
+            });
+
+        [AiResource(
+            Name = "VST3 parameters by plugin id",
+            Route = "vst3://params/{pluginId}",
+            MimeType = Consts.MimeType.TextJson,
+            ListResources = nameof(ListParamResources),
+            Description = "Parameter list for a loaded plugin instance.")]
+        public ResponseResourceContent[] ParamsById(string uri, string pluginId)
+        {
+            return MainThread.Instance.Run(() =>
+            {
+                if (!int.TryParse(pluginId, out var id) || id < 1)
+                {
+                    return AsArray(ResponseResourceContent.CreateText(
+                        uri,
+                        Consts.MimeType.TextJson,
+                        "{\"error\":\"invalid pluginId\"}"));
+                }
+
+                var host = jp.kshoji.unity.vst3nativehost.VstHostManager.Instance;
+                if (!host.IsInitialized || !host.LoadedPlugins.ContainsKey(id))
+                {
+                    return AsArray(ResponseResourceContent.CreateText(
+                        uri,
+                        Consts.MimeType.TextJson,
+                        $"{{\"error\":\"plugin not loaded\",\"pluginId\":{id}}}"));
+                }
+
+                var text = VstHostToolHelpers.FormatParamsList(id, includeHidden: false);
+                return AsArray(ResponseResourceContent.CreateText(uri, Consts.MimeType.TextJson, text));
+            });
+        }
+
+        public ResponseListResource[] ListAll() =>
+            new[]
+            {
+                new ResponseListResource("vst3://features", "VST3 features", true, Consts.MimeType.TextJson),
+                new ResponseListResource("vst3://scanned", "VST3 scanned plugins", true, Consts.MimeType.TextJson),
+                new ResponseListResource("vst3://instances", "VST3 loaded instances", true, Consts.MimeType.TextJson),
+                new ResponseListResource("vst3://activity/recent", "VST3 recent activity", true, Consts.MimeType.TextJson),
+                new ResponseListResource("vst3://diagnostics", "VST3 audio diagnostics", true, Consts.MimeType.TextJson),
+                new ResponseListResource("vst3://settings", "VST3 runtime settings", true, Consts.MimeType.TextJson),
+            };
+
+        [AiResource(
+            Name = "VST3 audio graph by GameObject",
+            Route = "vst3://graph/{object}",
+            MimeType = Consts.MimeType.TextJson,
+            ListResources = nameof(ListGraphResources),
+            Description = "VstAudioGraph status for a scene GameObject (same as vst3-graph-status).")]
+        public ResponseResourceContent[] GraphByObject(string uri, string objectName)
+        {
+            return MainThread.Instance.Run(() =>
+            {
+                var name = string.IsNullOrWhiteSpace(objectName)
+                    ? VstHostToolHelpers.DefaultGraphObjectName
+                    : objectName.Trim();
+                var go = UnityEngine.GameObject.Find(name);
+                if (go == null)
+                {
+                    return AsArray(ResponseResourceContent.CreateText(
+                        uri,
+                        Consts.MimeType.TextJson,
+                        $"{{\"error\":\"GameObject not found\",\"name\":{EscapeJson(name)}}}"));
+                }
+
+                var graph = go.GetComponent<jp.kshoji.unity.vst3nativehost.VstAudioGraph>();
+                if (graph == null)
+                {
+                    return AsArray(ResponseResourceContent.CreateText(
+                        uri,
+                        Consts.MimeType.TextJson,
+                        $"{{\"error\":\"VstAudioGraph missing\",\"name\":{EscapeJson(name)}}}"));
+                }
+
+                var text = Tool_VstHost.FormatGraphStatus(graph);
+                return AsArray(ResponseResourceContent.CreateText(uri, Consts.MimeType.TextJson, text));
+            });
+        }
+
+        public ResponseListResource[] ListGraphResources()
+        {
+            return MainThread.Instance.Run(() =>
+            {
+                var graphs =
+#if UNITY_2023_1_OR_NEWER
+                    UnityEngine.Object.FindObjectsByType<jp.kshoji.unity.vst3nativehost.VstAudioGraph>(
+                        UnityEngine.FindObjectsSortMode.None);
+#else
+                    UnityEngine.Object.FindObjectsOfType<jp.kshoji.unity.vst3nativehost.VstAudioGraph>();
+#endif
+                if (graphs == null || graphs.Length == 0)
+                {
+                    return new[]
+                    {
+                        new ResponseListResource(
+                            $"vst3://graph/{VstHostToolHelpers.DefaultGraphObjectName}",
+                            "VST3 audio graph (none in scene)",
+                            false,
+                            Consts.MimeType.TextJson),
+                    };
+                }
+
+                var list = new System.Collections.Generic.List<ResponseListResource>();
+                foreach (var g in graphs)
+                {
+                    if (g == null) continue;
+                    var n = g.gameObject.name;
+                    list.Add(new ResponseListResource(
+                        $"vst3://graph/{n}",
+                        $"VST3 audio graph {n} armed={g.HasArmedGraph}",
+                        true,
+                        Consts.MimeType.TextJson));
+                }
+
+                return list.ToArray();
+            });
+        }
+
+        public ResponseListResource[] ListParamResources()
+        {
+            return MainThread.Instance.Run(() =>
+            {
+                var host = jp.kshoji.unity.vst3nativehost.VstHostManager.Instance;
+                if (!host.IsInitialized || host.LoadedPlugins.Count == 0)
+                {
+                    return new[]
+                    {
+                        new ResponseListResource(
+                            "vst3://params/0",
+                            "VST3 parameters (none loaded)",
+                            false,
+                            Consts.MimeType.TextJson),
+                    };
+                }
+
+                var list = new System.Collections.Generic.List<ResponseListResource>();
+                foreach (var id in host.LoadedPlugins.Keys)
+                {
+                    list.Add(new ResponseListResource(
+                        $"vst3://params/{id}",
+                        $"VST3 parameters pluginId={id}",
+                        true,
+                        Consts.MimeType.TextJson));
+                }
+
+                return list.ToArray();
+            });
+        }
+
+        static ResponseResourceContent[] TextFromTool(string uri, Func<string> tool)
+        {
+            return MainThread.Instance.Run(() =>
+            {
+                var text = tool();
+                return AsArray(ResponseResourceContent.CreateText(uri, Consts.MimeType.TextJson, text));
+            });
+        }
+
+        static ResponseResourceContent[] AsArray(ResponseResourceContent content) =>
+            new[] { content };
+
+        static string EscapeJson(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return "\"\"";
+            return "\"" + value
+                .Replace("\\", "\\\\")
+                .Replace("\"", "\\\"")
+                .Replace("\n", "\\n")
+                .Replace("\r", "\\r")
+                .Replace("\t", "\\t") + "\"";
+        }
+    }
+}

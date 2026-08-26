@@ -2,7 +2,8 @@
     "name": "jp.kshoji.unity.vst3nativehost.Tests",
     "references": [
         "UnityEngine.TestRunner",
-        "jp.kshoji.unity.vst3nativehost.Runtime"
+        "jp.kshoji.unity.vst3nativehost.Runtime",
+        "jp.kshoji.unity.vst3nativehost.Mcp.Core"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

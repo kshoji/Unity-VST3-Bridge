@@ -1,0 +1,32 @@
+{
+    "name": "jp.kshoji.unity.vst3nativehost.Mcp.Tests",
+    "references": [
+        "UnityEngine.TestRunner",
+        "jp.kshoji.unity.vst3nativehost.Runtime",
+        "jp.kshoji.unity.vst3nativehost.Mcp.Core",
+        "jp.kshoji.unity.vst3nativehost.Mcp.Runtime",
+        "com.IvanMurzak.Unity.MCP.Runtime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll",
+        "McpPlugin.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS",
+        "FEATURE_UNITY_MCP",
+        "UNITY_MCP_READY"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.ivanmurzak.unity.mcp",
+            "expression": "0.76.0",
+            "define": "FEATURE_UNITY_MCP"
+        }
+    ],
+    "noEngineReferences": false
+}

@@ -75,6 +75,17 @@ namespace jp.kshoji.unity.vst3nativehost.Editor
 
                     settings.ExtraScanFolders = folders;
 
+                    EditorGUILayout.Space();
+                    if (GUILayout.Button("Export Runtime MCP Config to Resources…"))
+                    {
+                        EditorApplication.ExecuteMenuItem(
+                            "Window/VST3 Host/Export Runtime MCP Config to Resources");
+                    }
+                    EditorGUILayout.HelpBox(
+                        "Standalone builds read Resources/VstHostRuntimeMcpConfig.asset " +
+                        "(not Project Settings). Export copies scan folders and auto-init; set MCP host/token on the asset.",
+                        MessageType.Info);
+
                     if (EditorGUI.EndChangeCheck())
                         settings.Save();
                 },

@@ -41,6 +41,13 @@ namespace jp.kshoji.unity.vst3nativehost
                 Apply();
         }
 
+        /// <summary>MCP / runtime wiring for network virtual device → adapter.</summary>
+        public void Configure(VstHostMidiAdapter? adapterRef = null)
+        {
+            if (adapterRef != null)
+                adapter = adapterRef;
+        }
+
         /// <summary>Filters the adapter to the network virtual device and registers it.</summary>
         public void Apply()
         {

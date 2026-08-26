@@ -30,6 +30,15 @@ namespace jp.kshoji.unity.vst3nativehost
                 Apply();
         }
 
+        /// <summary>MCP / runtime wiring for Chuck event MIDI → adapter.</summary>
+        public void Configure(VstHostMidiAdapter? adapterRef = null, string? deviceIdOverride = null)
+        {
+            if (adapterRef != null)
+                adapter = adapterRef;
+            if (deviceIdOverride != null)
+                virtualDeviceIdOverride = deviceIdOverride;
+        }
+
         public string ResolveDeviceId()
         {
             if (!string.IsNullOrEmpty(virtualDeviceIdOverride))

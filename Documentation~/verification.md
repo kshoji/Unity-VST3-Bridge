@@ -208,6 +208,56 @@ When linking the repo via `file:` / Git, `native~/**/build*` outputs may appear 
 Unity-MCP (`vst3-*` tools) can drive the same host workflows as the manual matrix above when installed separately; see [mcp.md](mcp.md).
 Unity-MCP itself is not part of this package.
 
+## Runtime MCP (Standalone)
+
+Prerequisites: Unity-MCP ≥ 0.76.0 installed, Desktop Standalone build, `VstHostRuntimeMcpConfig` in Resources with `mcpEnabled` and matching server **token**, MCP server running.
+
+| Step | Action | Expect |
+|------|--------|--------|
+| **Config** | Create or **Window → VST3 Host → Export Runtime MCP Config to Resources**; set `mcpEnabled`, `host`, `token` | Asset at `Assets/Resources/VstHostRuntimeMcpConfig.asset` |
+| **Scene** | Sample scene or AudioListener + `VstHostAudioFilter` | Audible path for note test |
+| **Build** | Win / macOS / Linux Standalone (Mono or IL2CPP) | Player contains native bridge; test build session separately from Editor |
+| **Connect** | MCP client → **running executable** (not Editor) | Runtime tools only (no `vst3-settings-set`, `vst3-verify-platforms`, mapping CRUD) |
+| **Smoke** | `vst3-features-status` | `mcp-runtime: available` |
+| **Smoke** | `vst3-host-status` | `[Success]` with `session=runtime` (Editor Play Mode: `session=playMode`) |
+| **Smoke** | `vst3-host-init` → `vst3-scan` → `vst3-load` → `vst3-note-on` → `vst3-note-off-all` | Plugin loads; note audible when instrument + audio path OK |
+| **Params** | `vst3-params-list` / `vst3-param-get` / `vst3-param-set` on loaded plugin | Normalized get/set succeeds |
+| **Graph** (optional) | `vst3-graph-status` / `vst3-graph-build-*` in graph sample | Topology matches Editor Play Mode behavior |
+| **Duplicate ID** | Editor **Play Mode** + `tools/list` filter `vst3-host-status` | Exactly **one** entry (Runtime asmdef only) |
+
+Platform notes:
+
+- **Windows / macOS / Linux:** same VST3 constraints as manual verify above; IL2CPP builds use package `link.xml` preserves.
+- **`vst3-verify-platforms`:** Editor only — run before building, not from Standalone MCP.
+- **WebGL / mobile:** Runtime MCP assemblies excluded; expect unavailable in `vst3-features-status`.
+
+Automated smoke (when Unity-MCP resolves in the test project): `Tests/Runtime/Mcp/` — assembly registration, config formatting, tool checks; Play Mode tests for `vst3-host-status` and `vst3-param-get` error paths.
+
+### Test Runner (Play Mode package tests)
+
+Package tests under `Tests/` do **not** appear for Git URL / `file:` installs until the **project** lists this package in `testables`. Embedded copies under `Packages/jp.kshoji.unity.vst3nativehost` are testable by default.
+
+1. Edit the **consuming project's** `Packages/manifest.json` (not this package's `package.json`):
+
+```json
+{
+  "dependencies": {
+    "jp.kshoji.unity.vst3nativehost": "file:/absolute/path/to/Unity-VST3-Bridge",
+    "com.unity.test-framework": "1.1.33",
+    "com.ivanmurzak.unity.mcp": "…"
+  },
+  "testables": [
+    "jp.kshoji.unity.vst3nativehost"
+  ]
+}
+```
+
+2. Wait for domain reload (or re-open the project).
+3. **Window → General → Test Runner → PlayMode**.
+4. Expect at least `McpExecutionContextTests` / `McpRuntimeAssemblyRegistrationTests` (and graph/mapping tests). With Unity-MCP ready (`UNITY_MCP_READY`), also `VstHostMcpToolSmokeTests` / `VstHostRuntimeMcpConfigTests` under assembly `…Mcp.Tests` (plain NUnit `[Test]` smoke — no `EnterPlayMode`).
+
+If PlayMode still shows **No tests to show**: confirm `com.unity.test-framework` is installed, `testables` spelling matches `package.json` `name`, and Console has no asmdef / define errors for `jp.kshoji.unity.vst3nativehost.Tests`.
+
 ## MIDI-only build must not contain VST
 
 ```powershell

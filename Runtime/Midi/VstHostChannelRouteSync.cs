@@ -35,6 +35,26 @@ namespace jp.kshoji.unity.vst3nativehost
                 Sync();
         }
 
+        public SyncDirection Direction
+        {
+            get => direction;
+            set => direction = value;
+        }
+
+        /// <summary>MCP / runtime wiring for adapter ↔ graph sync.</summary>
+        public void Configure(
+            VstHostMidiAdapter? adapterRef = null,
+            VstAudioGraph? graphRef = null,
+            SyncDirection? syncDirection = null)
+        {
+            if (adapterRef != null)
+                adapter = adapterRef;
+            if (graphRef != null)
+                graph = graphRef;
+            if (syncDirection.HasValue)
+                direction = syncDirection.Value;
+        }
+
         /// <summary>Applies the configured sync direction once.</summary>
         public void Sync()
         {

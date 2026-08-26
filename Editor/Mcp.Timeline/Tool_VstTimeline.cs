@@ -19,8 +19,9 @@ namespace jp.kshoji.unity.vst3nativehost.mcp.timeline
 
         [AiTool("vst3-timeline-param-track", Title = "VST3 / Timeline Parameter Track")]
         [Description(
-            "Ensure PlayableDirector + TimelineAsset with a VstParameterTrack bound to VstParameterTarget, " +
-            "and a clip for parameterId. Creates Assets/... timeline if needed.")]
+            "Editor only — ensure PlayableDirector + TimelineAsset with a VstParameterTrack bound to VstParameterTarget, " +
+            "and a clip for parameterId. Creates Assets/... timeline if needed. " +
+            "Standalone: use vst3-timeline-director-control on a pre-authored scene.")]
         public string TimelineParamTrack
         (
             [Description("Loaded plugin instance id.")]
@@ -113,7 +114,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp.timeline
 
         [AiTool("vst3-timeline-program-marker", Title = "VST3 / Timeline Program Marker")]
         [Description(
-            "Ensure VstTimelineNotificationReceiver and a VstProgramChangeMarker on a marker track.")]
+            "Editor only — ensure VstTimelineNotificationReceiver and a VstProgramChangeMarker on a marker track.")]
         public string TimelineProgramMarker
         (
             [Description("Loaded plugin instance id.")]

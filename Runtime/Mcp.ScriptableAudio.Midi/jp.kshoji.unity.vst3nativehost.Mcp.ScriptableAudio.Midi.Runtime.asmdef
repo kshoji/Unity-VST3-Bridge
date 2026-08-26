@@ -1,0 +1,40 @@
+{
+    "name": "jp.kshoji.unity.vst3nativehost.Mcp.ScriptableAudio.Midi.Runtime",
+    "rootNamespace": "jp.kshoji.unity.vst3nativehost.mcp.scriptableaudio",
+    "references": [
+        "jp.kshoji.unity.vst3nativehost.Runtime",
+        "jp.kshoji.unity.vst3nativehost.Mcp.Core",
+        "jp.kshoji.unity.vst3nativehost.ScriptableAudio",
+        "jp.kshoji.unity.vst3nativehost.ScriptableAudio.Midi"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [
+        "WebGL",
+        "Android",
+        "iOS"
+    ],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "McpPlugin.dll",
+        "McpPlugin.Common.dll",
+        "ReflectorNet.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "FEATURE_MIDI_PLUGIN",
+        "FEATURE_SCRIPTABLE_AUDIO",
+        "UNITY_6000_3_OR_NEWER",
+        "!UNITY_WEBGL",
+        "FEATURE_UNITY_MCP",
+        "UNITY_MCP_READY"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.ivanmurzak.unity.mcp",
+            "expression": "0.76.0",
+            "define": "FEATURE_UNITY_MCP"
+        }
+    ],
+    "noEngineReferences": false
+}
