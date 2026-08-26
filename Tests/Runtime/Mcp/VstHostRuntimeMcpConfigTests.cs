@@ -24,6 +24,22 @@ namespace jp.kshoji.unity.vst3nativehost.tests.mcp
         }
 
         [Test]
+        public void HasRequiredToken_FalseWhenEmptyOrWhitespace()
+        {
+            var cfg = ScriptableObject.CreateInstance<VstHostRuntimeMcpConfig>();
+            cfg.token = "";
+            Assert.IsFalse(cfg.HasRequiredToken);
+
+            cfg.token = "   ";
+            Assert.IsFalse(cfg.HasRequiredToken);
+
+            cfg.token = "secret";
+            Assert.IsTrue(cfg.HasRequiredToken);
+
+            Object.DestroyImmediate(cfg);
+        }
+
+        [Test]
         public void LoadFromResources_DoesNotThrow()
         {
             // May be null or an asset — verification projects often have

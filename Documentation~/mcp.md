@@ -82,9 +82,9 @@ When `VstHostRuntimeMcpConfig.mcpEnabled` is true, `VstHostMcpRuntimeBootstrap` 
 |-------|---------|
 | `mcpEnabled` | Master switch; when false, no MCP connection is started |
 | `host` | MCP server URL (e.g. `http://localhost:8080`) |
-| `token` | Bearer token required by the server — set a non-empty value when enabling |
+| `token` | Bearer token — **required** when `mcpEnabled` is true (empty token blocks Bootstrap connect) |
 | `autoInitializeHostOnStart` | Calls host init from audio settings after connect |
-| `extraScanFolders` | Additional absolute `.vst3` scan paths |
+| `extraScanFolders` | Extra absolute `.vst3` paths; **`vst3-scan` merges these** after OS-standard folders |
 | `preferredPluginNameContains` | Hint for auto-load helpers |
 
 **Placement:** `Assets/Resources/VstHostRuntimeMcpConfig.asset` (Create → VST3 Host → Runtime MCP Config), or **Window → VST3 Host → Export Runtime MCP Config to Resources** / Project Settings → VST3 Host to copy scan folders from Project Settings.
@@ -103,7 +103,7 @@ Editor-only steps (mapping asset CRUD, Timeline track creation, VS register, ver
 ### Security
 
 - Runtime MCP is **opt-in** (`mcpEnabled = false` by default).
-- Use a **non-empty token** when enabling; treat it like an API key.
+- Use a **non-empty token** when enabling; Bootstrap refuses to connect if the token is empty. Treat it like an API key.
 - Prefer **localhost** binding on the MCP server; exposing MCP on a LAN or WAN increases remote-control risk for host load, parameters, and MIDI injection.
 - Desktop Standalone only (same platform bounds as VST3 native). WebGL / mobile targets exclude Runtime MCP assemblies.
 

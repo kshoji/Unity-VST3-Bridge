@@ -60,9 +60,18 @@ namespace jp.kshoji.unity.vst3nativehost.mcp.runtime
             if (s_started)
                 return;
 
+            if (!cfg.HasRequiredToken)
+            {
+                Debug.LogError(
+                    "[VST3 Host] Runtime MCP not started: mcpEnabled is true but token is empty. " +
+                    "Set a non-empty token on VstHostRuntimeMcpConfig before enabling.");
+                return;
+            }
+
             try
             {
                 var runtimeAssembly = typeof(Tool_VstHost).Assembly;
+                var token = cfg.token.Trim();
                 UnityMcpPluginRuntime.Initialize(mcpBuilder =>
                     {
                         mcpBuilder.WithConfig(c =>
@@ -70,9 +79,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp.runtime
                             c.Host = string.IsNullOrWhiteSpace(cfg.host)
                                 ? "http://localhost:8080"
                                 : cfg.host.Trim();
-                            var token = cfg.token ?? string.Empty;
-                            c.CredentialProvider = () => Task.FromResult<string?>(
-                                string.IsNullOrEmpty(token) ? null : token);
+                            c.CredentialProvider = () => Task.FromResult<string?>(token);
                             // McpPlugin ctor runs GenerateSkillFilesIfNeeded; without a root it
                             // logs InvalidOperationException (MCP-Plugin-dotnet #107 / Unity-MCP #766).
                             // Standalone has no Unity project folder — use persistentDataPath.

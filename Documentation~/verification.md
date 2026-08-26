@@ -214,7 +214,7 @@ Prerequisites: Unity-MCP ≥ 0.76.0 installed, Desktop Standalone build, `VstHos
 
 | Step | Action | Expect |
 |------|--------|--------|
-| **Config** | Create or **Window → VST3 Host → Export Runtime MCP Config to Resources**; set `mcpEnabled`, `host`, `token` | Asset at `Assets/Resources/VstHostRuntimeMcpConfig.asset` |
+| **Config** | Create or **Window → VST3 Host → Export Runtime MCP Config to Resources**; set `mcpEnabled`, `host`, **non-empty `token`** | Asset at `Assets/Resources/VstHostRuntimeMcpConfig.asset`; empty token → Bootstrap does not connect |
 | **Scene** | Sample scene or AudioListener + `VstHostAudioFilter` | Audible path for note test |
 | **Build** | Win / macOS / Linux Standalone (Mono or IL2CPP) | Player contains native bridge; test build session separately from Editor |
 | **Connect** | MCP client → **running executable** (not Editor) | Runtime tools only (no `vst3-settings-set`, `vst3-verify-platforms`, mapping CRUD) |

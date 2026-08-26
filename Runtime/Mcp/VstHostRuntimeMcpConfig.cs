@@ -20,19 +20,22 @@ namespace jp.kshoji.unity.vst3nativehost.mcp.runtime
         [Tooltip("MCP server URL (e.g. http://localhost:8080).")]
         public string host = "http://localhost:8080";
 
-        [Tooltip("Bearer token presented to the MCP server.")]
+        [Tooltip("Bearer token presented to the MCP server. Required when mcpEnabled is true.")]
         public string token = "";
 
         [Tooltip("Call vst3-host-init (InitializeFromAudioSettings) after MCP connects.")]
         public bool autoInitializeHostOnStart = true;
 
-        [Tooltip("Optional extra VST3 scan folders (absolute paths).")]
+        [Tooltip("Optional extra VST3 scan folders (absolute paths). Included by vst3-scan.")]
         public string[] extraScanFolders = System.Array.Empty<string>();
 
         [Tooltip("Preferred plugin name substring for auto-load helpers (future use).")]
         public string preferredPluginNameContains = "";
 
         const string DefaultResourceName = "VstHostRuntimeMcpConfig";
+
+        /// <summary>True when a non-empty token is set (required for Runtime MCP connect).</summary>
+        public bool HasRequiredToken => !string.IsNullOrWhiteSpace(token);
 
         /// <summary>Load the config from Resources, or null when missing.</summary>
         public static VstHostRuntimeMcpConfig? LoadFromResources()

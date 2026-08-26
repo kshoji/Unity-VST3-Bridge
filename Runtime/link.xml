@@ -10,7 +10,7 @@
   <assembly fullname="jp.kshoji.unity.vst3nativehost.Mcp.ScriptableAudio.Midi.Runtime" preserve="all" />
   <assembly fullname="jp.kshoji.unity.vst3nativehost.Mcp.Midi.Chunity.Runtime" preserve="all" />
   <assembly fullname="jp.kshoji.unity.vst3nativehost.Mcp.Midi.Network.Runtime" preserve="all" />
-  <!-- Unity-MCP precompiled refs (Phase 0 IL2CPP spike). -->
+  <!-- Unity-MCP precompiled refs (IL2CPP / AOT). -->
   <assembly fullname="McpPlugin" preserve="all" />
   <assembly fullname="McpPlugin.Common" preserve="all" />
   <assembly fullname="ReflectorNet" preserve="all" />

@@ -1,9 +1,11 @@
 #nullable enable
+using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using com.IvanMurzak.McpPlugin;
 using com.IvanMurzak.ReflectorNet.Utils;
+using jp.kshoji.unity.vst3nativehost;
 using jp.kshoji.unity.vst3nativehost.mcp.core;
-using VstHost = jp.kshoji.unity.vst3nativehost.VstHostManager;
 
 namespace jp.kshoji.unity.vst3nativehost.mcp.runtime
 {
@@ -14,7 +16,8 @@ namespace jp.kshoji.unity.vst3nativehost.mcp.runtime
             Title = "VST3 / Scan",
             ReadOnlyHint = true)]
         [Description(
-            "Scan OS-standard VST3 folders. Requires vst3-host-init. " +
+            "Scan OS-standard VST3 folders, then merge VstHostRuntimeMcpConfig.extraScanFolders " +
+            "(Resources) when present. Dedupes by uid|path. Requires vst3-host-init. " +
             "Returns name/vendor/category/uid/path.")]
         public string Scan
         (
@@ -27,10 +30,59 @@ namespace jp.kshoji.unity.vst3nativehost.mcp.runtime
                 if (!TryRequireInitialized("vst3-scan", out var error))
                     return error!;
 
-                var plugins = Host.Scan();
+                var plugins = ScanStandardPlusRuntimeExtras(out var extraFolderCount);
                 RememberScan(plugins);
-                return $"[Success] vst3-scan\n{VstHostToolHelpers.FormatScanned(plugins, maxResults)}";
+                var extraMsg = extraFolderCount > 0
+                    ? $" extraFolders={extraFolderCount}"
+                    : string.Empty;
+                return
+                    $"[Success] vst3-scan{extraMsg}\n" +
+                    VstHostToolHelpers.FormatScanned(plugins, maxResults);
             });
+        }
+
+        /// <summary>
+        /// OS-standard scan plus optional <see cref="VstHostRuntimeMcpConfig.extraScanFolders"/>.
+        /// </summary>
+        internal static List<VstHostManager.ScannedPlugin> ScanStandardPlusRuntimeExtras(
+            out int extraFolderCount)
+        {
+            extraFolderCount = 0;
+            var merged = new List<VstHostManager.ScannedPlugin>();
+            merged.AddRange(Host.Scan());
+
+            var cfg = VstHostRuntimeMcpConfig.LoadFromResources();
+            var extras = cfg?.extraScanFolders;
+            if (extras == null || extras.Length == 0)
+                return DedupeScanned(merged);
+
+            for (var i = 0; i < extras.Length; i++)
+            {
+                var folder = extras[i];
+                if (string.IsNullOrWhiteSpace(folder))
+                    continue;
+                extraFolderCount++;
+                merged.AddRange(Host.ScanFolder(folder.Trim()));
+            }
+
+            return DedupeScanned(merged);
+        }
+
+        static List<VstHostManager.ScannedPlugin> DedupeScanned(
+            List<VstHostManager.ScannedPlugin> plugins)
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var unique = new List<VstHostManager.ScannedPlugin>(plugins.Count);
+            for (var i = 0; i < plugins.Count; i++)
+            {
+                var p = plugins[i];
+                var key = (p.Uid ?? string.Empty) + "|" + (p.FilePath ?? string.Empty);
+                if (!seen.Add(key))
+                    continue;
+                unique.Add(p);
+            }
+
+            return unique;
         }
 
         [AiTool(
