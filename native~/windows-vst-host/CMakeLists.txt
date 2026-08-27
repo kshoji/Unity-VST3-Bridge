@@ -4,8 +4,15 @@ project(VstHostNative VERSION 0.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# --- VST3 SDK paths ---
+# --- VST3 SDK paths (local clone via Fetch-Vst3Sdk.ps1 / Fetch-Vst3Sdk.sh) ---
 set(VST3SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vst3sdk")
+
+if(NOT EXISTS "${VST3SDK_DIR}/public.sdk/source/vst/hosting/module_win32.cpp")
+    message(FATAL_ERROR
+        "VST3 SDK missing module_win32.cpp. Run:\n"
+        "  .\\Fetch-Vst3Sdk.ps1\n"
+        "from native~/windows-vst-host (creates ./vst3sdk).")
+endif()
 
 # SDK cmake helpers
 list(APPEND CMAKE_MODULE_PATH "${VST3SDK_DIR}/cmake/modules")

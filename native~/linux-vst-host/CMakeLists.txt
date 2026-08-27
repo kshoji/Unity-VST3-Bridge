@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Shared Windows tree: sources + VST3 SDK submodule
+# Shared Windows tree: sources + VST3 SDK checkout (Fetch-Vst3Sdk.*)
 set(WIN_HOST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../windows-vst-host")
 set(VST3SDK_DIR "${WIN_HOST_DIR}/vst3sdk")
 set(WIN_HOST_SRC "${WIN_HOST_DIR}/src")
@@ -13,8 +13,8 @@ set(WIN_HOST_SRC "${WIN_HOST_DIR}/src")
 if(NOT EXISTS "${VST3SDK_DIR}/public.sdk/source/vst/hosting/module_linux.cpp")
     message(FATAL_ERROR
         "VST3 SDK missing module_linux.cpp. Run:\n"
-        "  git submodule update --init --recursive\n"
-        "from the repository root (SDK lives under native~/windows-vst-host/vst3sdk).")
+        "  ./Fetch-Vst3Sdk.sh\n"
+        "from native~/windows-vst-host (SDK path: native~/windows-vst-host/vst3sdk).")
 endif()
 
 set(SDK_ROOT "${VST3SDK_DIR}")

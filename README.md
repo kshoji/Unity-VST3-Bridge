@@ -29,12 +29,12 @@ https://github.com/kshoji/Unity-VST3-Bridge.git
 - `Samples~/` — importable samples
 - `Documentation~/` — package documentation (usage, verification, limitations, etc.)
 - `Tests/` — optional package tests
-- `native~/` — C++ source for `VstHostNative` (**Git repo only**)
+- `native~/` — C++ source for `VstHostNative` (**Git repo only**; rebuilders fetch SDK via `Fetch-Vst3Sdk.*`)
   - Trailing `~` = Unity AssetDatabase ignores this folder on Git URL / `file:` installs
   - Also listed in `.npmignore` for registry publishes
-  - `native~/windows-vst-host/` — Windows DLL
-  - `native~/macos-vst-host/` — macOS bundle (shares SDK submodule under windows tree)
-  - `native~/linux-vst-host/` — Linux `.so` (shares SDK submodule under windows tree)
+  - `native~/windows-vst-host/` — Windows DLL (+ shared SDK checkout path `vst3sdk/`)
+  - `native~/macos-vst-host/` — macOS bundle (shares SDK under windows tree)
+  - `native~/linux-vst-host/` — Linux `.so` (shares SDK under windows tree)
 
 ## Documentation
 
@@ -119,27 +119,30 @@ graph / optional MIDI wiring). See [Documentation~/mcp.md](Documentation~/mcp.md
 
 ## Native build / VST3 SDK
 
-Rebuilders need the SDK submodule (under `native~/windows-vst-host/vst3sdk`) plus
-platform toolchains:
+Rebuilders need a local VST3 SDK checkout under `native~/windows-vst-host/vst3sdk`
+(not a git submodule — so UPM Git URL installs do not recurse into Steinberg’s
+deep tree on Windows) plus platform toolchains:
 
 ```powershell
 # Windows
-git submodule update --init --recursive -- native~/windows-vst-host/vst3sdk
 cd native~/windows-vst-host
+.\Fetch-Vst3Sdk.ps1
 .\Build.ps1 -Install
 ```
 
 ```bash
 # macOS
-git submodule update --init --recursive -- native~/windows-vst-host/vst3sdk
-cd native~/macos-vst-host
+cd native~/windows-vst-host
+chmod +x ./Fetch-Vst3Sdk.sh && ./Fetch-Vst3Sdk.sh
+cd ../macos-vst-host
 ./Build.sh --Install
 ```
 
 ```bash
 # Linux (WSL2 or native)
-git submodule update --init --recursive -- native~/windows-vst-host/vst3sdk
-cd native~/linux-vst-host
+cd native~/windows-vst-host
+chmod +x ./Fetch-Vst3Sdk.sh && ./Fetch-Vst3Sdk.sh
+cd ../linux-vst-host
 ./Build.sh --Install
 ```
 

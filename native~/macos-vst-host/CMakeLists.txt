@@ -11,7 +11,7 @@ if(NOT DEFINED CMAKE_OSX_ARCHITECTURES OR CMAKE_OSX_ARCHITECTURES STREQUAL "")
     set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "macOS architectures" FORCE)
 endif()
 
-# Shared Windows tree: sources + VST3 SDK submodule
+# Shared Windows tree: sources + VST3 SDK checkout (Fetch-Vst3Sdk.*)
 set(WIN_HOST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../windows-vst-host")
 set(VST3SDK_DIR "${WIN_HOST_DIR}/vst3sdk")
 set(WIN_HOST_SRC "${WIN_HOST_DIR}/src")
@@ -19,8 +19,8 @@ set(WIN_HOST_SRC "${WIN_HOST_DIR}/src")
 if(NOT EXISTS "${VST3SDK_DIR}/public.sdk/source/vst/hosting/module_mac.mm")
     message(FATAL_ERROR
         "VST3 SDK missing module_mac.mm. Run:\n"
-        "  git submodule update --init --recursive\n"
-        "from the repository root (SDK lives under native~/windows-vst-host/vst3sdk).")
+        "  ./Fetch-Vst3Sdk.sh\n"
+        "from native~/windows-vst-host (SDK path: native~/windows-vst-host/vst3sdk).")
 endif()
 
 # Avoid SMTG_VST3_SDK / smtg_detect_xcode_version: Command Line Tools builds

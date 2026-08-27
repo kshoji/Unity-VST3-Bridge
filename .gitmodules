@@ -1,3 +1,0 @@
-[submodule "native~/windows-vst-host/vst3sdk"]
-	path = native~/windows-vst-host/vst3sdk
-	url = https://github.com/steinbergmedia/vst3sdk.git

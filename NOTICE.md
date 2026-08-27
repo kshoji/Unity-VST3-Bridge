@@ -16,7 +16,7 @@ VST® is a registered trademark of Steinberg Media Technologies GmbH.
 If you refer to the VST trademark or use the VST Compatible Logo in product
 materials, follow Steinberg’s [VST3 Usage Guidelines](https://github.com/steinbergmedia/vst3sdk/blob/master/VST3_Usage_Guidelines.pdf)
 (`native~/windows-vst-host/vst3sdk/VST3_Usage_Guidelines.pdf` when the SDK
-submodule is present).
+checkout is present).
 
 ## VST3 SDK (build-time dependency)
 
@@ -25,36 +25,39 @@ submodule is present).
 | Item | Detail |
 |------|--------|
 | Upstream | [steinbergmedia/vst3sdk](https://github.com/steinbergmedia/vst3sdk) |
-| In this repo | Git submodule at `native~/windows-vst-host/vst3sdk/` |
-| Required submodules | `pluginterfaces`, `base`, `public.sdk`, `cmake` |
+| In this repo | Local clone at `native~/windows-vst-host/vst3sdk/` (gitignored; not a submodule) |
+| Required nested checkouts | `pluginterfaces`, `base`, `public.sdk`, `cmake` |
 | Not required for this host | `vstgui4`, `doc`, `tutorials` |
 
 ```powershell
-# After cloning Unity-VST3-Bridge
-git submodule update --init --recursive -- native~/windows-vst-host/vst3sdk
-# Windows:
+# After cloning Unity-VST3-Bridge (developers / rebuilders only)
 cd native~/windows-vst-host
+.\Fetch-Vst3Sdk.ps1   # or ./Fetch-Vst3Sdk.sh
+# Windows:
 .\Build.ps1 -Install
 ```
 
 ```bash
-# macOS (same SDK submodule path):
-cd native~/macos-vst-host
+# macOS (same SDK path under windows-vst-host):
+cd native~/windows-vst-host && ./Fetch-Vst3Sdk.sh
+cd ../macos-vst-host
 ./Build.sh --Install
 ```
 
 ```bash
-# Linux (same SDK submodule path; WSL2 OK for build):
-cd native~/linux-vst-host
+# Linux (same SDK path; WSL2 OK for build):
+cd native~/windows-vst-host && ./Fetch-Vst3Sdk.sh
+cd ../linux-vst-host
 ./Build.sh --Install
 ```
 
 UPM / registry packages **do not** include `native~/` (see `.npmignore`).
 Git URL and `file:` installs also skip AssetDatabase import because the folder
 name ends with `~` (see [Documentation~/package-excludes.md](Documentation~/package-excludes.md)).
-End users who only consume the prebuilt `Plugins/.../VstHostNative`
-(`.dll` / `.bundle` / `.so`) do not need a local SDK checkout. Rebuilders and
-contributors do.
+The SDK is **not** a git submodule so UPM Git URL installs do not recurse into
+Steinberg’s deep tree (Windows path-length failures). End users who only consume
+the prebuilt `Plugins/.../VstHostNative` (`.dll` / `.bundle` / `.so`) do not need
+a local SDK checkout. Rebuilders and contributors do.
 
 ### SDK license (summary)
 

@@ -16,6 +16,10 @@ Thumbs.db
 [Bb]uilds/
 *.log
 
+# VST3 SDK (developer checkout via native~/windows-vst-host/Fetch-Vst3Sdk.*)
+# Not a git submodule — keeps UPM Git URL installs off the deep Steinberg tree.
+native~/windows-vst-host/vst3sdk/
+
 # Native build output (committed DLLs/bundles go in Plugins/)
 # Folder is native~ so Unity AssetDatabase ignores it on Git/file: installs.
 native~/**/build/

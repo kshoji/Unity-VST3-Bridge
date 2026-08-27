@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- VST3 SDK is no longer a git submodule. Developers clone it with
+  `native~/windows-vst-host/Fetch-Vst3Sdk.ps1` / `Fetch-Vst3Sdk.sh` so UPM Git URL
+  installs on Windows do not recurse into Steinberg’s long-path trees.
+  See [NOTICE.md](NOTICE.md) and [Documentation~/package-excludes.md](Documentation~/package-excludes.md).
+
 ## 1.4.2
 
 ### Added

@@ -58,15 +58,17 @@ Expects SDK sample `again.vst3` under the platform default VST3 folder, or set
 
 ## VST3 SDK
 
-The SDK is included as a Git submodule at `vst3sdk/`.
-After cloning, run:
+The SDK is **not** a git submodule (UPM Git URL installs recurse submodules and
+hit Windows path-length limits on Steinberg’s `doc` / sample trees). Developers
+who rebuild natives clone it next to this script:
 
-```bash
-git submodule update --init --recursive
+```powershell
+.\Fetch-Vst3Sdk.ps1          # or ./Fetch-Vst3Sdk.sh on macOS / Linux / WSL
+.\Fetch-Vst3Sdk.ps1 -Force   # re-clone
 ```
 
-Only the `pluginterfaces`, `base`, `public.sdk`, and `cmake` sub-submodules are
-required for building. `vstgui4`, `doc`, and `tutorials` are not needed.
+Only the `pluginterfaces`, `base`, `public.sdk`, and `cmake` nested checkouts are
+fetched. `vstgui4`, `doc`, and `tutorials` are not needed.
 
 VST® is a registered trademark of Steinberg Media Technologies GmbH.
 

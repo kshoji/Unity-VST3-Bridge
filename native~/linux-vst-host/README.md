@@ -1,7 +1,7 @@
 # VstHostNative — Linux bridge
 
 Builds **`VstHostNative.so`** (x86_64) for Unity `DllImport("VstHostNative")`.
-Shares C++ sources and the VST3 SDK submodule with `../windows-vst-host/`.
+Shares C++ sources and the VST3 SDK checkout with `../windows-vst-host/`.
 
 ## Prerequisites
 
@@ -9,11 +9,12 @@ Shares C++ sources and the VST3 SDK submodule with `../windows-vst-host/`.
 - CMake 3.25+
 - g++ or clang with C++17
 - Ninja (optional; falls back to Unix Makefiles)
-- VST3 SDK submodule initialized:
+- VST3 SDK fetched under `../windows-vst-host/vst3sdk`:
 
 ```bash
 # From repository root
-git submodule update --init --recursive
+cd native~/windows-vst-host
+chmod +x ./Fetch-Vst3Sdk.sh && ./Fetch-Vst3Sdk.sh
 ```
 
 ## Building
