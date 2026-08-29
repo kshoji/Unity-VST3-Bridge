@@ -1,11 +1,11 @@
 # Plan template (dev-only)
 
-> Internal. Not for Asset Store / `Assets/MIDI/documents/`.  
-> After acceptance, archive under `docs/dev/` (optional `docs/dev/i18n/` only — never `documents/i18n/`).  
-> Do not leave redirect stubs under `Assets/MIDI/documents/`.
+> Internal. Not for `Documentation~/`.  
+> After acceptance, archive under `docs/dev/`.  
+> Do not leave redirect stubs under `Documentation~/`.
 
 Status: Draft  
-Related release docs: (paths under `Assets/MIDI/documents/` — no development-plan phase wording)
+Related release docs: (paths under `Documentation~/` — no development-plan phase wording)
 
 ## 1. Goal
 
@@ -35,7 +35,7 @@ Do **not** copy these headings into source or release docs.
 
 ## 5. External contract (release artifacts)
 
-Use **only this section** when writing code comments, READMEs, and `Assets/MIDI/documents/**`.
+Use **only this section** when writing code comments, READMEs, and `Documentation~/**`.
 
 ### Features / APIs
 
@@ -50,7 +50,7 @@ Use **only this section** when writing code comments, READMEs, and `Assets/MIDI/
 
 - Development-plan phase labels, links to this plan / `docs/dev` / `.cursor/plans`
 - “Implemented in Phase N”, Moved stubs under `documents/`
-- Copying this file into `Assets/MIDI/documents/` or `documents/i18n/`
+- Copying this file into `Documentation~/`
 
 ## 6. Risks
 

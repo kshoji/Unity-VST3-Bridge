@@ -3,7 +3,7 @@
 Active / in-progress development plans for Plan mode and Agent handoff.
 
 - **Not** part of Asset Store / product documentation.
-- Do **not** link here from `Assets/MIDI/documents/` or package READMEs.
+- Do **not** link here from `Documentation~/` or package READMEs.
 - Completed archives → move to [`docs/dev/`](../../docs/dev/).
 
 ## Workflow
@@ -11,7 +11,7 @@ Active / in-progress development plans for Plan mode and Agent handoff.
 1. Plan mode → **copy** [`_template.md`](_template.md) to a new `{topic}-plan.md` in this folder (do not invent a layout from scratch).
 2. Implement against the template’s **External contract** section only when touching release docs / READMEs / comments.
 3. Keep phase labels inside the plan file only (see `.cursor/rules/dev-plans-vs-release-docs.mdc`).
-4. When done, archive under `docs/dev/` (not under `Assets/MIDI/documents/`) and optionally leave a one-line note here.
+4. When done, archive under `docs/dev/` (not under `Documentation~/`) and optionally leave a one-line note here.
 5. Never leave **Moved:** stubs under `documents/`; update `docs/dev/README.md` if an archive path must be discoverable.
 
 ## Naming

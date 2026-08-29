@@ -11,10 +11,10 @@ alwaysApply: true
 |------|------|-----------|
 | Active Cursor plans | `.cursor/plans/` | No |
 | Archived / long-form internal plans, spikes | `docs/dev/` | No |
-| User-facing docs | `Assets/MIDI/documents/` (+ `i18n/`) | Yes |
+| User-facing docs | `Documentation~/` | Yes |
 | Package / feature READMEs | under `Assets/MIDI/**/README.md` | Yes |
 
-Never create `*-plan.md`, `*-spike-notes.md`, phase checklists, ADR drafts, or **Moved:** redirect stubs under `Assets/MIDI/documents/` (including `i18n/`).  
+Never create `*-plan.md`, `*-spike-notes.md`, phase checklists, ADR drafts, or **Moved:** redirect stubs under `Documentation~/` (including `i18n/`).  
 If an old path under `documents/` is wrong, delete it or leave a note only in `docs/dev/README.md` — do not leave stubs in the release tree.
 
 ## When implementing from a plan
@@ -22,11 +22,11 @@ If an old path under `documents/` is wrong, delete it or leave a note only in `d
 - Follow the plan’s **External contract** / deliverable contract (APIs, paths, behaviors, user-doc outlines).
 - Do **not** copy plan phase labels into release artifacts.
 
-Forbidden in release artifacts (source, comments, READMEs, `Assets/MIDI/documents/**`):
+Forbidden in release artifacts (source, comments, READMEs, `Documentation~/**`):
 
 - Development-plan stage labels used as shipping status: `Phase N`, `Phase 0–N`, `P0`–`P9` as plan milestones, 「Phase N で実装」「フェーズ N で追加」など
 - Links to `.cursor/plans/**` or `docs/dev/**` from user-facing docs or package READMEs
-- Translating or copying `docs/dev/**` (or `.cursor/plans/**`) into `Assets/MIDI/documents/` / `documents/i18n/`
+- Translating or copying `docs/dev/**` (or `.cursor/plans/**`) into `Documentation~/`
 
 Allowed in `.cursor/plans/` and `docs/dev/` only: phase numbering, Status, internal checklists.
 
@@ -44,11 +44,9 @@ When writing user docs, use the external contract (or a separate outline section
 - **Always** start from [`.cursor/plans/_template.md`](../plans/_template.md); save the new file under `.cursor/plans/` (e.g. `{topic}-plan.md`).
 - After acceptance/complete, archive under `docs/dev/` if it should stay in-repo; optionally one line in `.cursor/plans/README.md`.
 - Do not place plans next to release docs “for convenience.”
-- Optional translations of archives live only under `docs/dev/i18n/` — never under `Assets/MIDI/documents/i18n/`.
+- Optional translations of archives live only under `docs/dev/i18n/` — never under `Documentation~/i18n/`.
 
 ## i18n / “translate documents” requests
 
-- Scope of `Assets/MIDI/documents/` (+ `i18n/`) = **user-facing** docs only.
+- Scope of `Documentation~/` = **user-facing** docs only.
 - Do **not** treat missing `docs/dev` translations (or absence of a plan under `documents/`) as a gap to fill in release docs.
-- Do **not** add ja/zh copies of plans or spikes under `documents/i18n/`.
-- `docs/dev/i18n/` and `documents/i18n/` are separate trees; never merge or mirror one into the other.
