@@ -23,6 +23,23 @@ namespace jp.kshoji.unity.vst3nativehost
         public bool IsInitialized => initialized;
         public IReadOnlyDictionary<int, LoadedPluginInfo> LoadedPlugins => loadedPlugins;
 
+        /// <summary>
+        /// Native <c>VstHostNative</c> is available in the Unity Editor and Desktop
+        /// Standalone (Windows / macOS / Linux) only. Mobile and other players skip
+        /// all native calls so missing DLLs do not throw <see cref="DllNotFoundException"/>.
+        /// </summary>
+        public static bool IsNativeHostSupported
+        {
+            get
+            {
+#if UNITY_EDITOR || UNITY_STANDALONE
+                return true;
+#else
+                return false;
+#endif
+            }
+        }
+
         public static VstHostManager Instance
         {
             get
@@ -100,6 +117,15 @@ namespace jp.kshoji.unity.vst3nativehost
                 return true;
             }
 
+            if (!IsNativeHostSupported)
+            {
+                Debug.LogWarning(
+                    "[VstHost] Native host is not supported on this platform " +
+                    $"(Application.platform={Application.platform}). " +
+                    "Supported: Unity Editor and Desktop Standalone (Windows / macOS / Linux).");
+                return false;
+            }
+
             // Unity DSP buffers are often 256–1024; keep headroom for OnAudioFilterRead.
             if (blockSize < 256)
                 blockSize = 256;
@@ -143,6 +169,9 @@ namespace jp.kshoji.unity.vst3nativehost
 
         public void Terminate()
         {
+            if (!IsNativeHostSupported)
+                return;
+
             if (!initialized)
             {
                 // Editor: C# may have been domain-reloaded while native stayed initialized.

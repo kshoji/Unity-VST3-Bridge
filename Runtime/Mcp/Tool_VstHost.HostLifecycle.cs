@@ -26,6 +26,15 @@ namespace jp.kshoji.unity.vst3nativehost.mcp.runtime
         {
             return MainThread.Instance.Run(() =>
             {
+                if (!VstHostManager.IsNativeHostSupported)
+                {
+                    return
+                        "[Error] vst3-host-init unsupported platform " +
+                        $"(Application.platform={Application.platform}). " +
+                        "Native host requires Unity Editor or Desktop Standalone " +
+                        "(Windows / macOS / Linux).";
+                }
+
                 var ok = fromAudioSettings
                     ? Host.InitializeFromAudioSettings(blockSizeHeadroom)
                     : Host.Initialize(sampleRate, blockSize);

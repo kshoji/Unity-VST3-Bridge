@@ -85,6 +85,16 @@ namespace jp.kshoji.unity.vst3nativehost.sample
         {
             guiScale = Screen.width > Screen.height ? Screen.width / 1024f : Screen.height / 1024f;
 
+            if (!VstHostManager.IsNativeHostSupported)
+            {
+                status = $"Unsupported platform ({Application.platform})";
+                Debug.LogWarning(
+                    "[VstHostSample] VST3 Host sample disabled on this platform " +
+                    $"({Application.platform}). Requires Unity Editor or Desktop Standalone.");
+                enabled = false;
+                return;
+            }
+
             var host = VstHostManager.Instance;
             if (!host.IsInitialized)
                 host.InitializeFromAudioSettings();
@@ -116,6 +126,9 @@ namespace jp.kshoji.unity.vst3nativehost.sample
 
         private void Start()
         {
+            if (!VstHostManager.IsNativeHostSupported)
+                return;
+
             Rescan();
             if (loadOnStart)
                 TryAutoLoad();

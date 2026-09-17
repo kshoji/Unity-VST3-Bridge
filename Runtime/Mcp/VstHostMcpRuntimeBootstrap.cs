@@ -98,13 +98,22 @@ namespace jp.kshoji.unity.vst3nativehost.mcp.runtime
 
                 if (cfg.autoInitializeHostOnStart)
                 {
-                    var host = VstHostManager.Instance;
-                    if (!host.IsInitialized)
+                    if (!VstHostManager.IsNativeHostSupported)
                     {
-                        host.InitializeFromAudioSettings(2);
-                        Debug.Log(
-                            "[VST3 Host] Runtime auto host-init " +
-                            $"sr={host.SampleRate} block={host.BlockSize}");
+                        Debug.LogWarning(
+                            "[VST3 Host] Runtime auto host-init skipped: native host is not " +
+                            $"supported on this platform ({Application.platform}).");
+                    }
+                    else
+                    {
+                        var host = VstHostManager.Instance;
+                        if (!host.IsInitialized)
+                        {
+                            host.InitializeFromAudioSettings(2);
+                            Debug.Log(
+                                "[VST3 Host] Runtime auto host-init " +
+                                $"sr={host.SampleRate} block={host.BlockSize}");
+                        }
                     }
                 }
             }
