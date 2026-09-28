@@ -30,7 +30,7 @@ namespace jp.kshoji.unity.vst3nativehost.mcp.runtime
                 {
                     return
                         "[Error] vst3-host-init unsupported platform " +
-                        $"(Application.platform={Application.platform}). " +
+                        $"(Application.platform={UnityEngine.Application.platform}). " +
                         "Native host requires Unity Editor or Desktop Standalone " +
                         "(Windows / macOS / Linux).";
                 }
